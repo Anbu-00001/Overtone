@@ -1,0 +1,31 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/overtone-sim",
+    "crates/overtone-rl",
+    "crates/overtone-spec",
+    "crates/overtone-cli",
+    "crates/overtone-wasm",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+license = "Apache-2.0"
+repository = "https://github.com/overtone-qrl/overtone"
+
+[workspace.dependencies]
+overtone-sim = { path = "crates/overtone-sim" }
+# No entropy source, deliberately: every random draw in this workspace is seeded
+# explicitly (Part I 5, determinism). Dropping default features removes the getrandom
+# dependency entirely, which both enforces that invariant and lets the core crates build
+# for wasm32-unknown-unknown without a "js" shim.
+rand = { version = "0.8", default-features = false }
+rand_chacha = { version = "0.3", default-features = false }
+rayon = "1.10"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1

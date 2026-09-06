@@ -1,0 +1,11 @@
+name = "OvertoneLab"
+uuid = "1f8b4c2e-9d3a-4e7b-8c5f-2a6d9e0b3f14"
+version = "0.1.0"
+
+[deps]
+Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+Yao = "5872b779-8223-5990-8dd0-5abbb0748c8c"
+
+[compat]
+julia = "1.10"

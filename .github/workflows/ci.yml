@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  rust:
+    name: rust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Clippy (parallel feature)
+        run: cargo clippy -p overtone-sim --features parallel --all-targets -- -D warnings
+
+      - name: Test
+        run: cargo test --workspace
+
+      - name: Test (parallel feature)
+        run: cargo test -p overtone-sim --features parallel
+
+      # The demo ships as WASM with no backend (Part I 3, Part IV 1), so the core crate
+      # must keep building for wasm32. It has no entropy dependency, deliberately, which
+      # is what lets this pass without a getrandom shim.
+      - name: Build for wasm32
+        run: cargo build -p overtone-sim --target wasm32-unknown-unknown
+
+  oracle:
+    name: yao oracle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.12"
+      - uses: julia-actions/cache@v2
+
+      - name: Generate cases from the Rust engine
+        run: cargo run -q -p overtone-sim --example emit_oracle_cases > lab/test/cases.txt
+
+      - name: Install Yao.jl
+        run: julia --project=lab -e 'using Pkg; Pkg.instantiate()'
+
+      # Part I 9: "Gradients match Yao.jl to 1e-12", enforced here rather than asserted
+      # in prose.
+      - name: Differential test against Yao.jl
+        run: julia --project=lab lab/test/oracle.jl

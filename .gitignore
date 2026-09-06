@@ -1,0 +1,49 @@
+# Rust build output
+/target/
+**/*.rs.bk
+
+# Cargo.lock is COMMITTED, deliberately. Do not add it here.
+#
+# The usual "libraries omit it, binaries commit it" rule already points that way, since
+# this workspace ships overtone-cli. But the stronger reason is Part I 5: same seed, same
+# trajectory. A run someone reproduces from a permalink has to resolve the same dependency
+# versions we did, and an unpinned lockfile quietly breaks that.
+
+# WASM build output (Phase 4). wasm-pack writes pkg/ next to the crate it builds.
+/crates/overtone-wasm/pkg/
+/web/pkg/
+/web/node_modules/
+
+# Oracle cases are generated from the Rust engine on demand and never edited by hand:
+#   cargo run -q -p overtone-sim --example emit_oracle_cases > lab/test/cases.txt
+# Committing them would let the fixture drift out of step with the engine it came from,
+# which is the one failure mode a differential test must not have.
+/lab/test/cases.txt
+
+# Julia coverage and profiling artefacts.
+#
+# lab/Manifest.toml is COMMITTED, deliberately. CI runs Pkg.instantiate() against it, so
+# pinning it is what makes "gradients match Yao.jl to 1e-12" a claim about a specific Yao
+# version rather than about whatever resolved that morning.
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
+/lab/docs/build/
+/lab/docs/site/
+
+# Generated figures are committed (Part I 5 lists figures/ as a deliverable used by the
+# README), so nothing is ignored here. Left as a note so nobody adds figures/ later.
+
+# Editor and OS noise
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Local tool indexes are NOT listed here. .codegraph/, graphify-out/ and .serena/ are
+# per-machine derived state, and .gitignore is a tracked file, so putting them here would
+# push one developer's tooling choices into everyone else's diff. They live in
+# .git/info/exclude instead, which is local and untracked.
