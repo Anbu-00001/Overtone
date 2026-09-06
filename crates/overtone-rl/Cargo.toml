@@ -1,5 +1,6 @@
 [package]
 name = "overtone-rl"
+description = "Environments, parameterised quantum policies, and REINFORCE."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,3 +9,9 @@ repository.workspace = true
 
 [dependencies]
 overtone-sim.workspace = true
+rand.workspace = true
+rand_chacha.workspace = true
+# microlp is pure Rust, so the LP ceiling stays available in the browser build. The
+# ceiling is drawn behind the learning curve (Part I 7.1), so it is not a native-only
+# convenience.
+good_lp = { version = "1.15", default-features = false, features = ["microlp"] }

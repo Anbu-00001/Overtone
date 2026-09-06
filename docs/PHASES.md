@@ -11,7 +11,7 @@ panel suggests itself.
 
 ---
 
-## Phase 1 — Foundation: simulator and verified gradients  *(M0, M1)*
+## Phase 1 — Foundation: simulator and verified gradients  *(M0, M1)*  — DONE
 
 **Spec:** Part I §5, §6.1, §6.4, §10, §14.
 
@@ -21,8 +21,10 @@ Workspace skeleton, state-vector engine, both gradient paths, differential testi
   single-qubit unitary, expectation values for Pauli observables.
 - Adjoint gradients — constant memory in circuit depth, all parameters in ~two passes.
 - Parameter-shift gradients — exact, `O(P)`, hardware-honest.
-- Oracles: a dense Kronecker reference sharing no code with the strided kernels; an
-  independent NumPy oracle; Yao.jl once Julia is available.
+- Oracles: a dense Kronecker reference sharing no code with the strided kernels, and
+  Yao.jl. (A NumPy oracle was scoped and dropped: with Julia installed, Yao.jl is the
+  stronger check, and a reference I write myself is not independent in the way that
+  matters.)
 
 **Exit criteria**
 - Adjoint and parameter-shift agree to `1e-10` on randomised circuits, every gate type.
@@ -36,7 +38,7 @@ renders until the gradients are right."
 
 ---
 
-## Phase 2 — RL loop, headless  *(M2)*
+## Phase 2 — RL loop, headless  *(M2)*  — DONE
 
 **Spec:** Part I §6.2, §6.3, §7.1.
 
@@ -47,11 +49,25 @@ renders until the gradients are right."
   polynomials with `|p| ≤ 1`. Solve numerically; do not guess a closed form.
 - Native CLI trains and emits JSONL traces.
 
-**Exit criteria**
-- The `L < k` zero-return result reproduces, seeded, in under 30 seconds: train 5k episodes
-  at `L = 2, k = 3`, assert `|J| < 0.02`.
-- Trained agents land on the LP ceiling staircase `J*(L)`.
-- Trainable `λ` dissolves the ceiling: `L = 1` reaches `k = 3`.
+**Exit criteria — all met**
+- The `L < k` zero-return result reproduces, seeded, in **0.08 s** against a 30 s budget.
+  Measured `J = 0.000000` exactly, not merely under the specified `|J| < 0.02`.
+- Trained agents land on the LP ceiling staircase `J*(C)`: `0.499656` against a step of
+  `0.5`.
+- Trainable `λ` dissolves the ceiling: `L = 1`, whose pinned ceiling is `0`, reaches
+  `J = 0.500940` with `λ` locked at `3.017`.
+
+**Corrections carried forward from the build**
+- The frequency ceiling is `L × (encoding gates per layer)`, not `L`. The zero-return test
+  depends on this; see `Ansatz::frequency_ceiling`.
+- Returns are asserted by quadrature, not by episode averaging. The sampled mean over 5000
+  episodes has a standard error near `0.014`, so the spec's `|J| < 0.02` on sampled return
+  would be a 1.4σ test that flakes about one run in six.
+- The `λ` return landscape is a resonance curve with a capture range of roughly
+  `[1.8, 4.2]` at `k = 3`. Gradient ascent from `λ = 1` locks onto a sidelobe. A coarse
+  tune precedes the fine tune.
+- The LP staircase bounds RAW-PQC only. SOFTMAX-PQC is not band-limited and measurably
+  exceeds it — at `L = 2, k = 3` it scores `0.110` where the ceiling is `0`.
 
 ---
 
@@ -62,7 +78,10 @@ renders until the gradients are right."
 The crown jewel. `overtone-spec` must make each of the five Part I §1 phenomena measurable
 by a function that returns numbers, each with a test.
 
-- Fourier extraction: sample the logit function on `N = 512` over `[-π, π)`, real FFT.
+- Fourier extraction: sample the policy on `N = 512` over `[-π, π)`, real FFT.
+  **Transform `π(a|s)`, not the logit.** Part I §6.5 says "logit", but for a SOFTMAX-PQC the
+  logit is `β·w·⟨Z⟩`, exactly as band-limited as the RAW-PQC's — transforming it would show
+  no leakage and quietly falsify a true claim. The leakage lives in the probability.
 - Von Neumann entropy across the half-chain bipartition; `--no-entangle` ablation.
 - Gradient-variance sweep, `n = 2…12`, global vs local observable, fitted exponent.
 

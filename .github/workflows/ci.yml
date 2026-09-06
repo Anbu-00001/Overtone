@@ -40,7 +40,11 @@ jobs:
       # must keep building for wasm32. It has no entropy dependency, deliberately, which
       # is what lets this pass without a getrandom shim.
       - name: Build for wasm32
-        run: cargo build -p overtone-sim --target wasm32-unknown-unknown
+        run: |
+          cargo build -p overtone-sim --target wasm32-unknown-unknown
+          # overtone-rl too: the LP ceiling is drawn behind the learning curve in the
+          # browser, so good_lp must stay on a pure-Rust backend.
+          cargo build -p overtone-rl --target wasm32-unknown-unknown
 
   oracle:
     name: yao oracle

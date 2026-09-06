@@ -1,10 +1,16 @@
 [package]
 name = "overtone-cli"
+description = "Native trainer for Overtone; emits JSONL traces."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 
+[[bin]]
+name = "overtone"
+path = "src/main.rs"
+
 [dependencies]
 overtone-sim.workspace = true
+overtone-rl = { path = "../overtone-rl" }
