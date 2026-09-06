@@ -1,5 +1,6 @@
 [package]
 name = "overtone-spec"
+description = "Spectral, entanglement and gradient-variance instrumentation."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -8,3 +9,6 @@ repository.workspace = true
 
 [dependencies]
 overtone-sim.workspace = true
+overtone-rl = { path = "../overtone-rl" }
+rand.workspace = true
+rand_chacha.workspace = true

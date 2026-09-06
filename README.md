@@ -9,8 +9,8 @@ circuit. That is Schuld, Sweke and Meyer, *Phys. Rev. A* **103**, 032430 (2021).
 
 Overtone points that theorem at a reinforcement-learning policy in real time.
 
-**Status: Phase 2 of 8.** The simulator, both gradient paths, the RL loop and the LP ceiling
-are built and verified. Nothing renders yet. See [docs/PHASES.md](docs/PHASES.md) for the
+**Status: Phase 3 of 8.** The simulator, both gradient paths, the RL loop, the LP ceiling
+and the spectral instrument are built and verified. Nothing renders yet. See [docs/PHASES.md](docs/PHASES.md) for the
 plan and [docs/spec/](docs/spec/) for the full build specification.
 
 ---
@@ -45,6 +45,61 @@ cargo run --release -p overtone-cli -- ceiling --k 3 --max-c 12
 
 Each takes under a quarter of a second.
 
+## The spectral instrument
+
+Sample `pi(1|s)` over the observation axis, transform, and compare against the frequency
+ceiling the encoding allows. A RAW-PQC has nothing above it. A SOFTMAX-PQC does.
+
+```
+overtone spectrum --layers 3 --policy softmax
+
+ omega            |c|  in band?
+     0    0.500181599  in
+     3    0.608374038  in          <- the environment frequency
+     6    0.000295828  LEAKED
+     9    0.149150652  LEAKED      <- 3rd harmonic
+    15    0.054160716  LEAKED      <- 5th harmonic
+    21    0.020807...  LEAKED      <- 7th harmonic
+# leakage ratio 0.395942           (RAW-PQC on the same circuit: 0.000000)
+```
+
+**The claim needed sharpening before it could be tested.** Part I §1.4 states the leakage as
+"odd harmonics at `3L`, `5L`". Verified numerically, the accurate statement is: odd
+harmonics of the policy's **dominant in-band frequency**, which equals `L` only when the
+trained policy concentrates there. On `SpectralControl-k` it concentrates at `k`, so at
+`L = k = 3` the ladder lands on 9, 15, 21 — and `3L` coincides with `3k`, which is why the
+original phrasing looked right. At `L = 2`, where the policy cannot concentrate at 3, the
+leakage is broadband instead. Even multiples are suppressed roughly 500-fold, which is the
+signature of an odd nonlinearity and what separates "the softmax leaked" from "the numerics
+are noisy".
+
+Two further results the instrument had to get right to be trusted:
+
+- **`|J| <= |c_k|`**, with equality only at perfect phase alignment. The return (quadrature,
+  `overtone-rl`) and the spectrum (FFT, `overtone-spec`) share no code, so this bound is a
+  genuine cross-check; trained policies saturate it to within 0.05 radians.
+- **The frequency-`k` bar is simply absent** below the ceiling. The Phase 2 zero-return
+  result, seen directly rather than inferred from a number that happens to be zero.
+
+## Barren plateaus
+
+```
+overtone plateau --depth log:2 --max-qubits 11
+
+# local   Var ~ 2^(-0.337 n)   R^2 = 0.8807      <- not exponential; that is the finding
+# global  Var ~ 2^(-1.028 n)   R^2 = 0.9988
+```
+
+Global collapses exponentially; local does not, while the circuit stays shallow. Run it with
+`--depth linear:2` and the local rate rises to `0.914` — the escape is conditional on depth,
+so the honest claim is "shallow *and* local", not "local".
+
+Two things reported rather than smoothed over. The measured global rate is `1.03`, not the
+`1.98` Part I §6.7 quotes: that figure is the full 2-design result and this ansatz does not
+reach a 2-design at these depths. And the tempting explanation — that probing `theta_1`
+leaves one side of the circuit trivial and halves the exponent — was tested and **rejected**;
+a mid-circuit probe gives `1.08`, not `2`.
+
 ## What is verified today
 
 | Claim | Measured | Tolerance | Test |
@@ -59,8 +114,13 @@ Each takes under a quarter of a second.
 | Policy gradients match a finite difference | `< 1e-5` | `1e-5` | `overtone-rl/tests/policy_gradient.rs` |
 | REINFORCE is unbiased for the policy gradient | within 8% | 8% | `overtone-rl/tests/policy_gradient.rs` |
 | Reduced LP ceiling matches the unreduced one | `< 5e-5` | `5e-5` | `overtone-rl/src/ceiling.rs` |
+| RAW-PQC has no spectral energy above its ceiling | `~1e-16` | `1e-9` | `overtone-spec/tests/bandlimit.rs` |
+| SOFTMAX-PQC leaks, on odd harmonics | ratio `0.396` vs `0.0` | — | `overtone-spec/tests/bandlimit.rs` |
+| Radix-2 FFT matches a naive DFT | `< 1e-12·N` | `1e-12·N` | `overtone-spec/src/fft.rs` |
+| Entanglement entropy matches closed forms | `< 1e-12` | `1e-12` | `overtone-spec/src/entropy.rs` |
+| Global gradient variance collapses exponentially | `2^(-1.03n)`, R²`=0.999` | — | `overtone-spec/src/plateau.rs` |
 
-48 tests. Every number in the measured column is produced by the suite, and is the worst
+84 tests. Every number in the measured column is produced by the suite, and is the worst
 case across the full sweep rather than a typical value.
 
 ## Three things the specification did not say, that turned out to matter
@@ -166,7 +226,7 @@ instruction to solve it numerically is well taken.
 ## Building
 
 ```
-cargo test --workspace                          # 48 tests
+cargo test --workspace                          # 84 tests
 cargo test -p overtone-sim --features parallel  # plus the threaded kernels
 cargo clippy --workspace --all-targets -- -D warnings
 cargo build -p overtone-sim --target wasm32-unknown-unknown
@@ -186,7 +246,7 @@ julia --project=lab lab/test/oracle.jl
 ```
 crates/overtone-sim/    state vector, gates, adjoint and parameter-shift gradients
 crates/overtone-rl/     ansatz, policies, SpectralControl-k, REINFORCE, LP ceiling
-crates/overtone-spec/   Fourier, entropy, gradient variance        (Phase 3)
+crates/overtone-spec/   FFT, spectrum, entropy, gradient variance
 crates/overtone-cli/    native trainer, JSONL traces
 crates/overtone-wasm/   wasm-bindgen surface                       (Phase 4)
 lab/                    Yao.jl oracle and heavy sweeps

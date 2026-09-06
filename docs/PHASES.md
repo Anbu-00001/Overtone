@@ -71,7 +71,7 @@ renders until the gradients are right."
 
 ---
 
-## Phase 3 — Instrumentation  *(M3)*
+## Phase 3 — Instrumentation  *(M3)*  — DONE
 
 **Spec:** Part I §6.5, §6.6, §6.7.
 
@@ -85,11 +85,34 @@ by a function that returns numbers, each with a test.
 - Von Neumann entropy across the half-chain bipartition; `--no-entangle` ablation.
 - Gradient-variance sweep, `n = 2…12`, global vs local observable, fitted exponent.
 
-**Exit criteria**
-- No spectral energy beyond `L` for RAW-PQC, to `1e-9`.
-- SOFTMAX-PQC produces measurable energy at `3L`. **Verify numerically before writing the
-  claim down** (Part I §12) — if the numbers disagree with the story, change the story.
-- Fitted plateau exponent matches `Var ~ 2^(-cn)` for the global observable; local survives.
+**Exit criteria — all met**
+- No spectral energy beyond the ceiling for RAW-PQC: measured at the transform's rounding
+  floor, `~1e-16`, against the specified `1e-9`. Holds trained and untrained, every seed.
+- SOFTMAX-PQC leaks measurably: leakage ratio `0.396` at `L = 3`, against exactly `0` for
+  RAW-PQC on the same circuit.
+- Global observable collapses exponentially, `Var ~ 2^(-1.03 n)` with `R² = 0.999`; the
+  local observable decays at `0.337` with `R² = 0.88` — not exponential, which is the
+  finding.
+
+**Corrections carried forward from the build**
+- **The `3L` phrasing was too loose and was changed, per Part I §12.** Verified
+  numerically: the leakage sits at odd harmonics of the policy's *dominant in-band
+  frequency*, not of `L`. Trained at `L = k = 3` the leaked peaks are at 9, 15, 21, 27 with
+  even multiples suppressed ~500×; the two coincide only because the trained policy
+  concentrates at `k`. At `L = 2` the in-band content is spread and the leakage is
+  broadband instead.
+- **The plateau probe index is not a free choice.** A mid-circuit probe hits *structurally
+  zero* gradients for a local observable (variance `~1e-33`), which inverts the
+  global-versus-local result. Part I §6.7's `∂⟨O⟩/∂θ₁` is load-bearing.
+- Measured global rate is `1.03`, not the `1.98` Part I §6.7 quotes. That figure is the
+  full 2-design result; this ansatz does not reach a 2-design at the depths swept. The
+  hypothesis that probing `θ₁` halves the exponent was **tested and rejected** — a
+  mid-circuit probe gives 1.08, not 2.
+- The local observable's escape is conditional on shallow depth. At linear depth its rate
+  rises to `0.914`, essentially the global one. The honest claim is "shallow *and* local".
+- `|J| ≤ |c_k|` with equality only at perfect phase alignment, so the spectral instrument
+  and the return bound each other rather than being equal. Trained policies saturate it to
+  within 0.05 rad.
 
 ---
 

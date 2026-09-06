@@ -18,6 +18,8 @@ overtone - quantum RL spectral instrumentation
 USAGE:
     overtone train [OPTIONS]
     overtone ceiling [OPTIONS]
+    overtone spectrum [OPTIONS]
+    overtone plateau [OPTIONS]
 
 TRAIN OPTIONS:
     --k <N>            environment frequency for SpectralControl-k   [default: 3]
@@ -37,6 +39,17 @@ TRAIN OPTIONS:
 CEILING OPTIONS:
     --k <N>            environment frequency                         [default: 3]
     --max-c <N>        highest frequency ceiling to tabulate         [default: 12]
+
+SPECTRUM OPTIONS:
+    accepts the TRAIN options; trains, then transforms pi(1|s) and reports the
+    magnitude at each frequency together with what leaked above the ceiling
+
+PLATEAU OPTIONS:
+    --min-qubits <N>   sweep start                                   [default: 2]
+    --max-qubits <N>   sweep end                                     [default: 10]
+    --depth <KIND>     const:<d> | log:<c> | linear:<c>              [default: log:2]
+    --samples <N>      random parameter vectors per point            [default: 300]
+    --seed <N>         RNG seed                                      [default: 7]
 ";
 
 struct Args {
@@ -97,6 +110,8 @@ fn main() {
     match argv.first().map(String::as_str) {
         Some("train") => cmd_train(&Args::parse(&argv[1..])),
         Some("ceiling") => cmd_ceiling(&Args::parse(&argv[1..])),
+        Some("spectrum") => cmd_spectrum(&Args::parse(&argv[1..])),
+        Some("plateau") => cmd_plateau(&Args::parse(&argv[1..])),
         Some("--help") | Some("-h") | None => print!("{USAGE}"),
         Some(other) => fail(&format!("unknown command {other:?}\n\n{USAGE}")),
     }
@@ -249,4 +264,106 @@ fn json_f64(x: f64) -> String {
     } else {
         "null".to_string()
     }
+}
+
+fn cmd_spectrum(args: &Args) {
+    use overtone_spec::spectrum_of;
+
+    let k: usize = args.get("k", 3);
+    let qubits: usize = args.get("qubits", 2);
+    let layers: usize = args.get("layers", 2);
+    let beta: f64 = args.get("beta", 1.0);
+    let seed: u64 = args.get("seed", 7);
+    let softmax = args.text("policy", "raw") == "softmax";
+
+    let ansatz =
+        SpectralControlAnsatz::build(qubits, layers, Scaling::Pinned, !args.flag("no-entangle"));
+    let ceiling = ansatz.frequency_ceiling(0);
+    let policy = if softmax {
+        Policy::softmax(ansatz, beta)
+    } else {
+        Policy::raw(ansatz)
+    };
+
+    let env = SpectralControl::new(k);
+    let mut r = rng(seed);
+    let p0 = initial_params(&policy, 0.3, 1.0, &mut r);
+    let cfg = TrainConfig {
+        episodes: args.get("episodes", 5000),
+        batch_size: args.get("batch", 50),
+        learning_rate: args.get("lr", 0.05),
+        eval_nodes: 512,
+        record_every: 1,
+    };
+    let out = train(&policy, &p0, &env, &cfg, &mut r);
+
+    let s = spectrum_of(512, ceiling, |x| policy.prob_action1(&out.params, &[x]));
+
+    println!(
+        "# spectrum of pi(1|s) for a {} policy, L={layers}, ceiling={ceiling}, k={k}",
+        if softmax { "SOFTMAX-PQC" } else { "RAW-PQC" }
+    );
+    println!("# J = {:.6}", out.final_exact_return);
+    println!("{:>6} {:>14}  in band?", "omega", "|c|");
+    for (omega, magnitude) in s.magnitude.iter().enumerate().take(4 * ceiling.max(1) + 4) {
+        let tag = if omega <= ceiling { "in" } else { "LEAKED" };
+        println!("{omega:>6} {magnitude:>14.9}  {tag}");
+    }
+    println!("#");
+    println!("# max above ceiling  {:.3e}", s.energy_above_ceiling());
+    println!("# sum above ceiling  {:.3e}", s.total_above_ceiling());
+    println!("# leakage ratio      {:.6}", s.leakage_ratio());
+}
+
+fn cmd_plateau(args: &Args) {
+    use overtone_spec::plateau::{fit_exponential, sweep, CostLocality, DepthPolicy};
+
+    let lo: usize = args.get("min-qubits", 2);
+    let hi: usize = args.get("max-qubits", 10);
+    let samples: usize = args.get("samples", 300);
+    let seed: u64 = args.get("seed", 7);
+
+    let spec = args.text("depth", "log:2");
+    let (kind, value) = spec.split_once(':').unwrap_or(("log", "2"));
+    let value: usize = value
+        .parse()
+        .unwrap_or_else(|_| fail(&format!("bad --depth value in {spec:?}")));
+    let depth = match kind {
+        "const" => DepthPolicy::Constant(value),
+        "log" => DepthPolicy::Logarithmic(value),
+        "linear" => DepthPolicy::Linear(value),
+        other => fail(&format!(
+            "--depth kind must be const, log or linear, got {other:?}"
+        )),
+    };
+
+    let local = sweep(lo..=hi, depth, CostLocality::Local, samples, seed);
+    let global = sweep(lo..=hi, depth, CostLocality::Global, samples, seed);
+
+    println!("# gradient variance vs qubit count, depth policy {depth:?}, {samples} samples");
+    println!(
+        "{:>3} {:>6} {:>16} {:>16}",
+        "n", "depth", "Var local Z_0", "Var global ZZ..Z"
+    );
+    for (l, g) in local.iter().zip(&global) {
+        println!(
+            "{:>3} {:>6} {:>16.6e} {:>16.6e}",
+            l.num_qubits, l.depth, l.variance, g.variance
+        );
+    }
+
+    let fl = fit_exponential(&local);
+    let fg = fit_exponential(&global);
+    println!("#");
+    println!(
+        "# local   Var ~ 2^(-{:.3} n)   R^2 = {:.4}",
+        fl.rate, fl.r_squared
+    );
+    println!(
+        "# global  Var ~ 2^(-{:.3} n)   R^2 = {:.4}",
+        fg.rate, fg.r_squared
+    );
+    println!("#");
+    println!("# Cerezo et al. 2021: a local observable escapes the plateau only while the");
+    println!("# circuit stays shallow. Re-run with --depth linear:2 to watch it stop working.");
 }
