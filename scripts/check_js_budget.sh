@@ -12,7 +12,13 @@ if [ ! -d "$WEB" ]; then
     exit 0
 fi
 
-COUNT=$(find "$WEB" -name '*.js' -not -path '*/node_modules/*' -exec cat {} + 2>/dev/null | wc -l)
+# web/pkg/ holds wasm-bindgen's generated glue, which is not hand-written and is not what
+# the budget is about. The budget exists so that logic does not migrate out of Rust into
+# JS; counting machine-generated bindings against it would measure the wrong thing.
+COUNT=$(find "$WEB" -name '*.js' \
+    -not -path '*/node_modules/*' \
+    -not -path '*/pkg/*' \
+    -exec cat {} + 2>/dev/null | wc -l)
 
 echo "JS lines: $COUNT / $BUDGET"
 if [ "$COUNT" -gt "$BUDGET" ]; then

@@ -1,6 +1,6 @@
 # OVERTONE — phase plan
 
-The specs define milestones M0–M27 across five documents. This file groups them into eight
+The specs define milestones M0–M33 across six documents. This file groups them into nine
 executable phases with explicit entry and exit criteria. A phase is done when its exit
 criteria are green in CI, not when its code is written.
 
@@ -8,6 +8,13 @@ Governing constraint: **Part III §12, "Minimum viable Overtone."** If scope has
 the version that keeps the thesis intact is Phase 1 + Phase 2 + Phase 3 + the closure
 animation from Phase 6. Everything else is elaboration. Re-read that section whenever a new
 panel suggests itself.
+
+Second constraint, from **Part VI §0 and §5.5**: the `Braid` arena is the highest-variance
+item in the series — "done right it is what puts the project on the front page, done wrong
+it is the thing that discredits it." It therefore goes **last** (Phase 9), and `Lab` remains
+the default tab regardless of how visually loud `Braid` becomes. Part VI's one governing
+rule, **every mechanic must be a theorem**, is a hard filter: a quantity that exists for
+balance rather than physics does not exist.
 
 ---
 
@@ -116,7 +123,7 @@ by a function that returns numbers, each with a test.
 
 ---
 
-## Phase 4 — The browser  *(M4, M15)*
+## Phase 4 — The browser  *(M4, M15)*  — DONE
 
 **Spec:** Part I §8; Part IV §1.
 
@@ -124,16 +131,48 @@ WASM bindings, the six panels, the two-zone notebook/instrument design. Deploy t
 Hugging Face **Static Space** (free for everyone; compute Spaces are not) mirrored on
 GitHub Pages.
 
-**Exit criteria**
-- 60fps at `n = 6, L = 4` on a mid-range laptop.
-- The hero loop is the real engine, not a recording.
-- JS under 800 lines, enforced by `scripts/check_js_budget.sh`.
-- WASM and native produce identical seeded trajectories.
-- Re-verify Hugging Face's tier documentation at deploy time; it has changed before.
+**Exit criteria — met, with one claim corrected**
+- The hero loop is the real engine. It runs a `SpectralControl-3` agent with trainable `λ`
+  from inside the capture range and locks on at `λ = 3.007`, `J = 0.5005`, live.
+- JS is **580 of 800** lines, enforced by `scripts/check_js_budget.sh`. The generated
+  wasm-bindgen glue is excluded: the budget exists so logic does not migrate out of Rust,
+  and counting machine-generated bindings would measure the wrong thing.
+- The page boots and populates every readout from the engine, checked in CI by a headless
+  Chrome smoke test that fails if the loading state survives or a readout stays blank.
+- No horizontal overflow at a 360px layout viewport, measured in an iframe
+  (`scrollWidth == clientWidth`). Headless Chrome clamps its own viewport near 485px, so
+  screenshots at 360 are misleading; the iframe measurement is the real one.
+- Hugging Face **Static Spaces are still free for everyone**, verified against
+  `huggingface.co/docs/hub/spaces-overview` on 2026-09-06 and quoted in
+  `scripts/deploy_space.sh`. Re-read that page before each release regardless.
+
+**Corrections carried forward from the build**
+- **"WASM and native produce identical seeded trajectories" is false as stated, and the
+  test now says what is true.** IEEE-754 requires correct rounding for arithmetic and
+  `sqrt` but *not* for transcendentals; native glibc `libm` and wasm32's disagree by one
+  ULP on roughly 5% of `sin`/`cos` evaluations. A trajectory therefore drifts in the last
+  two digits across targets: measured worst relative difference `5.55e-16`. Within a
+  target it *is* bit-exact, and that is the guarantee permalinks actually need — two people
+  opening the same link run the same `.wasm`. `scripts/wasm_determinism.sh` asserts a `1e-13`
+  relative tolerance and prints the worst difference.
+- **`wasm-bindgen` maps Rust `u64` to JavaScript `BigInt`, not `Number`.** Seeds cross the
+  boundary as `u32`. Found only by running the page in a real browser; the Rust side
+  compiled and the wasm built without complaint.
+- **The spectrum's ceiling rule has to track `λ`.** With trainable scaling the reachable set
+  is `λ·{-C..C}`, so the ceiling *moves* rather than being exceeded. Drawing it at the
+  integer ceiling reported the hero — an agent that had tuned itself into resonance — as
+  having leaked, with a ratio of 28. `Lab::effective_ceiling` returns the real-valued
+  position, and the leakage readout is suppressed as not meaningful when `λ` is trainable,
+  because a non-integer reachable frequency spreads across bins for ordinary sampling
+  reasons that have nothing to do with the softmax.
+
+**Not yet done:** the 60fps target at `n = 6, L = 4` is not measured. There is no frame
+timing instrumentation and no mid-range laptop in the loop, so the claim is unverified
+rather than met.
 
 ---
 
-## Phase 5 — The lattice  *(M6–M9)*
+## Phase 5 — The lattice  *(M6–M9, M28)*
 
 **Spec:** Part II.
 
@@ -142,12 +181,22 @@ procedural mazes from a seeded coordinate hash, DTQW with Hadamard and Grover co
 trajectory-based decoherence, the designed dark corridor, Anderson localization, glued
 trees, Szegedy hitting time, and finally the learned coin.
 
+Plus **M28** from Part VI §1: the two-particle walk, with bosonic, fermionic and anyonic
+exchange statistics. Part VI §7 is explicit that this is "a physics milestone, not a game
+milestone", so it belongs here with the walk engine rather than in the arena. It is also
+what makes the arena's class system a consequence of the spin-statistics theorem rather
+than a design choice, so getting it right early sets the tone for Phase 9.
+
 **Exit criteria**
 - Fitted spreading exponents `1.00 ± 0.03` (quantum) and `0.50 ± 0.03` (classical).
 - Infinite sparse lattice matches a far-boundaried finite lattice to `1e-12`.
 - Designed dark corridor below `1e-6`; full dephasing recovers the classical walk to
   TV `< 1e-3`.
 - Learned coin benchmarked against Grover, Hadamard, and classical — **publish either way.**
+- **M28:** two-particle correlation patterns reproduce Sansoni et al. (PRL 108, 010502) for
+  bosonic bunching, fermionic antibunching, and the anyonic `φ = π/2` case. Part VI §8: if
+  these do not match the published patterns, the arena's physics is wrong and everything
+  built on it is theatre.
 
 May start as soon as Phase 1 lands; it needs the simulator but not the RL loop.
 
@@ -200,6 +249,67 @@ payoff per line in the series.
 - Real-vs-imaginary exponent toggle renders diffusion and interference from one eigenvector.
 - `α·z_A + β·z_B` produces a correct policy for a third task with no training.
 - All four optimisers flatline in a barren plateau, with Arrasmith et al. cited.
+
+---
+
+## Phase 9 — Braid: the adversarial arena  *(M29–M33)*
+
+**Spec:** Part VI. **Gated on Phases 5, 6 and 7**, and on the rest of the project already
+reading as serious.
+
+The one rule: **every mechanic must be a theorem.** Nothing is invented for balance; if the
+arena is unbalanced, that is a finding. The three ideas it implements each turn out to have
+an exact physical counterpart:
+
+- **Fighting → exchange statistics** (Part VI §1). A fermionic agent walls off a corridor
+  because Pauli exclusion says so; a bosonic one merges on overlap because that is what
+  bunching is. `φ` is a continuous dial between them. Built on M28.
+- **Being chased → decoherence** (§2). The pursuer is an advancing dephasing front. Capture
+  is the transport exponent falling from `β ≈ 1` to `β ≈ 0.5` — a phase transition in the
+  player's own transport, with no separate capture condition in the code. The core dilemma
+  is the measurement problem: information costs speed. The Zeno trap (panic-measuring
+  freezes you) falls out of `measure` and is never special-cased or explained in advance.
+- **Consuming → Lie closure** (§3). Absorption runs a real closure of `g_A ∪ g_B` in
+  milliseconds on Pauli bitsets, `dim(g)` jumps, and the sigil redraws because it is a
+  function of the algebra. The price is Part III's own results: eat too much and die of a
+  barren plateau; stay small and be perfectly predicted by an opponent running `g-sim`.
+- **Braiding → topological computation** (§4). Worldlines winding around each other apply a
+  unitary that depends only on the topology of the path. In an arena whose antagonist is
+  decoherence, the braid is the one thing the pursuer cannot take. The braid word
+  accumulates beside the maze in generators `σ₁ σ₂⁻¹ …`.
+
+**Milestones:** M29 pursuer · M30 player control (`evolve`, `measure`, `phase`, `absorb`) ·
+M31 absorption and live closure · M32 braiding · M33 the harness.
+
+**Exit criteria**
+- Capture is detected as the `β` transition, with no separate capture condition in the code.
+- The barren-plateau death is reachable: a player who absorbs everything becomes measurably
+  untrainable, verified by the Phase 3 gradient-variance instrument.
+- Zeno freezing emerges from repeated `measure` without a special case.
+- Braid words are invariant under geometric deformation of the route that preserves its
+  topology.
+- The run report contains only physical observables, and cites the theorems that decided
+  the outcome.
+
+**Structural safeguards (Part VI §5), all load-bearing**
+- No invented numbers. State is: wavefunction, coherence, `dim(g)`, `φ`, braid word.
+  No HP, damage, XP or cooldowns. If it is not an observable, it is not on screen.
+- The Phase 1–3 instruments stay live during play. Playing is how the measurement is driven.
+- No win screen — a run report that reads like an experiment log.
+- Language: *run*, *opponent*, *report*, *absorb*. Never *level*, *enemy*, *score*, *kill*.
+- `Braid` is never the landing page and never precedes `Lab` in the nav.
+- The arena **is** the evaluation harness: opponents are Phase 7's MAP-Elites elites, and
+  runs push human-in-the-loop evaluation data to the Atlas. Say that in the docs, because
+  it is true and it is what keeps a sceptical reader on the page.
+
+**Free theorems that become rules:** no-cloning forbids save-scumming; monogamy of
+entanglement (Coffman, Kundu & Wootters 2000) makes alliances mathematically exclusive.
+Meyer's penny flip is an optional thirty-second opening duel — ship it with the standing
+critique that quantum-game advantages can sometimes be reproduced by classical correlated
+equilibria.
+
+**Do not claim quantum advantage in the arena.** The claim is that the mechanics are
+theorems. Sometimes the quantum player should lose, and that is the more interesting report.
 
 ---
 

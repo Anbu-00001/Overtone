@@ -4,7 +4,7 @@ Quantum RL instrumentation. A variational quantum circuit that encodes classical
 exactly a truncated Fourier series in that data (Schuld, Sweke & Meyer, PRA 103, 032430).
 This repo points that theorem at a reinforcement-learning policy in real time.
 
-Build specs live in `docs/spec/` — Parts I through V. **Read the relevant part before
+Build specs live in `docs/spec/` — Parts I through VI. **Read the relevant part before
 touching a crate.** Part I is the spine; Parts II–V are companions that never replace it.
 Part III §12 ("Minimum viable Overtone") governs scope whenever a new panel suggests itself.
 
@@ -136,3 +136,8 @@ Credibility is the scarce resource in this field.
 - Do not compute Lie closures with dense matrices (Part III) — bitsets and XOR. A `2ⁿ`
   matrix anywhere in `overtone-lie` is a bug.
 - Do not interpolate animation frames. Discrete time is discrete.
+- **Every mechanic in `Braid` must be a theorem** (Part VI §0). Nothing is invented for
+  balance. No HP, damage, XP or cooldowns — if a quantity is not a physical observable it
+  is not on screen. If the arena is unbalanced, that is a finding, not a bug to tune.
+- `Lab` is the default tab. `Braid` never precedes it in the nav, and is never the landing
+  page (Part VI §5.5).

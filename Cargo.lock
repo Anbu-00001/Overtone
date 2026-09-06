@@ -219,7 +219,11 @@ dependencies = [
 name = "overtone-wasm"
 version = "0.1.0"
 dependencies = [
+ "overtone-rl",
  "overtone-sim",
+ "overtone-spec",
+ "rand_chacha",
+ "wasm-bindgen",
 ]
 
 [[package]]

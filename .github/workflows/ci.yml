@@ -45,6 +45,50 @@ jobs:
           # overtone-rl too: the LP ceiling is drawn behind the learning curve in the
           # browser, so good_lp must stay on a pure-Rust backend.
           cargo build -p overtone-rl --target wasm32-unknown-unknown
+          cargo build -p overtone-spec --target wasm32-unknown-unknown
+
+      - name: JS budget
+        run: ./scripts/check_js_budget.sh
+
+  browser:
+    name: browser
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: jetli/wasm-pack-action@v0.4.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Part I 5. Bit-exactness holds within a target but not across them: IEEE-754 does
+      # not require correctly-rounded transcendentals, and native libm disagrees with
+      # wasm32's by one ULP on roughly 5% of sin/cos evaluations. See the script.
+      - name: Native versus wasm agreement
+        run: ./scripts/wasm_determinism.sh
+
+      - name: Build the page
+        run: |
+          wasm-pack build crates/overtone-wasm --target web --out-dir pkg --release
+          mkdir -p web/pkg
+          cp crates/overtone-wasm/pkg/overtone_wasm.js \
+             crates/overtone-wasm/pkg/overtone_wasm_bg.wasm web/pkg/
+
+      # The page must boot and populate its readouts from the real engine. A page that
+      # loads but shows placeholders is the failure mode this catches.
+      - name: Smoke test in a headless browser
+        run: |
+          (cd web && python3 -m http.server 8731 &)
+          sleep 3
+          google-chrome --headless --disable-gpu --no-sandbox \
+            --virtual-time-budget=12000 --dump-dom http://localhost:8731/index.html > dom.html
+          grep -q 'id="loading"' dom.html && { echo "engine failed to boot"; exit 1; }
+          grep -qE '<b id="r-ceiling">[0-9]+</b>' dom.html || { echo "readouts not populated"; exit 1; }
+          grep -qE '<b id="hero-lambda">[0-9]' dom.html || { echo "hero did not run"; exit 1; }
+          echo "page booted and populated from the engine"
 
   oracle:
     name: yao oracle

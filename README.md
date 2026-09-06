@@ -9,9 +9,10 @@ circuit. That is Schuld, Sweke and Meyer, *Phys. Rev. A* **103**, 032430 (2021).
 
 Overtone points that theorem at a reinforcement-learning policy in real time.
 
-**Status: Phase 3 of 8.** The simulator, both gradient paths, the RL loop, the LP ceiling
-and the spectral instrument are built and verified. Nothing renders yet. See [docs/PHASES.md](docs/PHASES.md) for the
-plan and [docs/spec/](docs/spec/) for the full build specification.
+**Status: Phase 4 of 9.** The simulator, both gradient paths, the RL loop, the LP ceiling,
+the spectral instrument and the browser demo are built and verified. See
+[docs/PHASES.md](docs/PHASES.md) for the plan and [docs/spec/](docs/spec/) for the full
+build specification, Parts I to VI.
 
 ---
 
@@ -44,6 +45,28 @@ cargo run --release -p overtone-cli -- ceiling --k 3 --max-c 12
 ```
 
 Each takes under a quarter of a second.
+
+## The demo
+
+`web/` is the whole project in a browser, with no backend. Every number on the page is
+computed there by the same Rust engine the tests run against, compiled to WebAssembly —
+no pre-recorded traces, no cached results. The hero is a live `SpectralControl-3` agent with
+trainable input scaling, and you watch its single spectral peak slide up the frequency axis
+and lock onto the environment at `λ = 3.007`.
+
+```
+wasm-pack build crates/overtone-wasm --target web --out-dir pkg --release
+mkdir -p web/pkg && cp crates/overtone-wasm/pkg/overtone_wasm{.js,_bg.wasm} web/pkg/
+cd web && python3 -m http.server 8731
+```
+
+The JavaScript is a renderer and nothing else: **580 lines of 800**, enforced in CI. Every
+quantity a panel needs arrives from Rust already normalised and ordered, so the renderer
+draws and never computes. Deployment is a Hugging Face **Static Space**, which is free for
+everyone — Gradio and Docker Spaces run on compute and require a paid plan. That was
+re-verified against Hugging Face's own documentation on 2026-09-06 and is quoted in
+`scripts/deploy_space.sh`; it has changed before, so it is a release-checklist item rather
+than a fact to trust.
 
 ## The spectral instrument
 
@@ -119,11 +142,14 @@ a mid-circuit probe gives `1.08`, not `2`.
 | Radix-2 FFT matches a naive DFT | `< 1e-12·N` | `1e-12·N` | `overtone-spec/src/fft.rs` |
 | Entanglement entropy matches closed forms | `< 1e-12` | `1e-12` | `overtone-spec/src/entropy.rs` |
 | Global gradient variance collapses exponentially | `2^(-1.03n)`, R²`=0.999` | — | `overtone-spec/src/plateau.rs` |
+| Native and wasm32 trajectories agree | `5.55e-16` | `1e-13` | `scripts/wasm_determinism.sh` |
+| The page boots and reads from the engine | headless Chrome | — | `.github/workflows/ci.yml` |
+| JavaScript stays a renderer | 580 lines | 800 | `scripts/check_js_budget.sh` |
 
 84 tests. Every number in the measured column is produced by the suite, and is the worst
 case across the full sweep rather than a typical value.
 
-## Three things the specification did not say, that turned out to matter
+## Six things the specification did not say, that turned out to matter
 
 **The frequency ceiling counts encoding gates, not layers.** Part I states the reachable
 spectrum as `{-L..L}` for `L` layers. That holds only when each layer applies one encoding
@@ -165,6 +191,27 @@ says to transform "the policy's logit function", but for a SOFTMAX-PQC the logit
 `beta * w * <Z>`, which is exactly as band-limited as the RAW-PQC's. The spectral instrument
 has to transform the probability, or it will show no leakage and quietly falsify a true
 claim.
+
+**Bit-for-bit determinism across native and WASM is not attainable, and the test now says
+so.** Part I asks for identical seeded trajectories on both. IEEE-754 requires correct
+rounding for arithmetic and `sqrt` but *not* for transcendental functions, and native glibc
+`libm` disagrees with wasm32's by one unit in the last place on roughly 5% of `sin`/`cos`
+evaluations. A circuit applies thousands of those, so a trajectory drifts in its last two
+digits: measured worst relative difference `5.55e-16`. Within a target it *is* bit-exact,
+and that is the guarantee permalinks actually need — two people opening the same link run
+the same `.wasm` binary. The test asserts a tight tolerance and prints the worst difference
+rather than asserting an equality that is false.
+
+**`wasm-bindgen` maps Rust `u64` to JavaScript `BigInt`, not `Number`.** Seeds cross the
+boundary as `u32`. The Rust compiled, the wasm built, and the page failed at runtime with
+`Cannot convert 7 to a BigInt`; only running it in a real browser found it.
+
+**The spectrum's ceiling rule has to track `λ`.** With trainable scaling the reachable set
+is `λ·{-C..C}`, so the ceiling *moves* rather than being exceeded. Drawing it at the integer
+ceiling reported the hero — an agent that had just tuned itself into resonance — as having
+leaked, with a ratio of 28. The leakage readout is now suppressed as not meaningful whenever
+`λ` is trainable, because a non-integer reachable frequency spreads across neighbouring bins
+for ordinary sampling reasons that have nothing to do with the softmax.
 
 ## Why three gradient checks and not one
 
@@ -250,7 +297,7 @@ crates/overtone-spec/   FFT, spectrum, entropy, gradient variance
 crates/overtone-cli/    native trainer, JSONL traces
 crates/overtone-wasm/   wasm-bindgen surface                       (Phase 4)
 lab/                    Yao.jl oracle and heavy sweeps
-docs/spec/              the build specification, Parts I to V
+docs/spec/              the build specification, Parts I to VI
 ```
 
 The dependency direction is one-way and load-bearing. `overtone-sim` knows nothing about

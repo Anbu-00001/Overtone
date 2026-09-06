@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overtone</title>
+<meta name="description" content="A quantum policy is a truncated Fourier series. Overtone measures what that means, live.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="loading">loading the engine</div>
+
+<!-- Hero: one instrument, running, no controls, no copy. -->
+<section class="instrument hero">
+  <div class="hero-grid">
+    <canvas id="c-hero-spectrum"></canvas>
+    <canvas id="c-hero-return"></canvas>
+  </div>
+  <p class="hero-caption">
+    <span>lambda <b id="hero-lambda">--</b></span>
+    <span>J <b id="hero-return">--</b></span>
+    <span class="dim">SpectralControl-3, one encoding layer, input scaling trainable</span>
+  </p>
+</section>
+
+<main>
+<section class="prose">
+  <h1>Overtone</h1>
+  <p class="lede">A variational quantum circuit that encodes classical data is, exactly and
+  provably, a truncated Fourier series in that data. The frequencies it can reach are fixed
+  by the eigenvalues of the data-encoding gates; the coefficients are set by everything
+  else in the circuit.</p>
+
+  <p>That is Schuld, Sweke and Meyer, <i>Physical Review A</i> <b>103</b>, 032430. The
+  theorem is not new. Pointing it at a reinforcement-learning policy while the policy
+  trains, and watching what it forbids, is.</p>
+
+  <p>Above, an agent has one encoding layer. Its reachable frequencies are
+  <span class="m">lambda &times; {-1, 0, 1}</span>, and the environment rewards frequency
+  three. So it cannot score until <span class="m">lambda</span> reaches three, and you can
+  watch the peak slide until it does. It is a string being tuned, and that is not a
+  metaphor: it is what is happening.</p>
+
+  <h2>The environment is a Fourier coefficient extractor</h2>
+  <p><span class="m">SpectralControl-k</span> is a contextual bandit. A state is drawn
+  uniformly, there are two actions, and the reward is
+  <span class="m">r(s, a) = (2a - 1) cos(k s)</span>. Its expected return works out to
+  <span class="m">J = E[cos(ks) (2 pi(1|s) - 1)]</span>, which picks out precisely the
+  frequency-<span class="m">k</span> Fourier coefficient of the policy and ignores
+  everything else.</p>
+
+  <p>So a policy that cannot reach frequency <span class="m">k</span> scores
+  <b>exactly zero</b>. Not worse, not near chance. Zero, for every parameter setting,
+  forever. Set the layer count below the environment frequency in the panel below and the
+  return curve will sit flat on the axis while the agent trains against it.</p>
+</section>
+</main>
+
+<!-- Instrument. Controls live inside the dark zone, never floating in the prose. -->
+<section class="instrument">
+  <div class="controls">
+    <label>qubits <input id="qubits" type="range" min="1" max="6" value="2"><b id="qubits-value">2</b></label>
+    <label>layers <input id="layers" type="range" min="1" max="6" value="2"><b id="layers-value">2</b></label>
+    <label>k <input id="k" type="range" min="1" max="5" value="3"><b id="k-value">3</b></label>
+    <label>policy
+      <select id="policy"><option value="raw">RAW-PQC</option><option value="softmax">SOFTMAX-PQC</option></select>
+    </label>
+    <label class="check"><input id="lambda" type="checkbox"> lambda trainable</label>
+    <label class="check"><input id="entangle" type="checkbox" checked> entangle</label>
+    <label>seed <input id="seed" type="number" value="7" min="0" max="9999"></label>
+    <button id="run">run</button>
+    <button id="reset">reset</button>
+  </div>
+
+  <div class="readouts">
+    <span>ceiling <b id="r-ceiling">--</b></span>
+    <span>J* <b id="r-lp">--</b></span>
+    <span>J <b id="r-return">--</b></span>
+    <span>episodes <b id="r-episodes">--</b></span>
+    <span>lambda <b id="r-lambda">--</b></span>
+    <span>leak <b id="r-leak">--</b></span>
+  </div>
+
+  <div class="panel-grid">
+    <canvas id="c-circuit"></canvas>
+    <canvas id="c-state"></canvas>
+    <canvas id="c-spectrum"></canvas>
+    <canvas id="c-policy"></canvas>
+    <canvas id="c-return"></canvas>
+    <canvas id="c-gradcheck"></canvas>
+  </div>
+</section>
+
+<main>
+<section class="prose">
+  <h2>Where the softmax policy escapes its own circuit</h2>
+  <p>A RAW-PQC reads the Born rule directly, so
+  <span class="m">pi(1|s) = (1 + &lt;Z&gt;)/2</span> is a trig polynomial of bounded degree
+  and its spectrum stops dead at the ceiling. A SOFTMAX-PQC applies a sigmoid to that same
+  band-limited quantity, and a sigmoid of a trig polynomial is not band-limited. Switch the
+  policy above and bars appear past the rule.</p>
+
+  <p>They appear at odd harmonics of whichever frequency the policy has concentrated on,
+  not at odd multiples of the layer count. Those coincide when the agent has locked onto
+  the environment, which is why the looser phrasing looks right; at a layer count too low
+  to concentrate, the leakage is broadband instead. Even harmonics are suppressed a few
+  hundred fold, which is the signature of an odd nonlinearity rather than of noise.</p>
+
+  <p>The consequence worth stating: the ceiling drawn behind the return curve bounds a
+  strictly band-limited policy. It does not bound a softmax one, and a softmax agent will
+  climb straight past it.</p>
+
+  <h2>Barren plateaus, as a slider</h2>
+  <p>Sample random parameter vectors, take the gradient, and look at its variance as the
+  register grows. With a global observable the variance collapses exponentially and
+  training becomes hopeless at scale. With a local one, while the circuit stays shallow, it
+  does not.</p>
+
+  <p>The fitted exponent is printed beside the curves, because a number is more convincing
+  than a slope. Set the depth policy to linear and the local observable stops escaping —
+  the result is <i>shallow and local</i>, not <i>local</i>.</p>
+</section>
+</main>
+
+<section class="instrument">
+  <div class="controls">
+    <label>max qubits <input id="p-max" type="range" min="4" max="11" value="9"><b id="p-max-value">9</b></label>
+    <label>depth
+      <select id="p-depth"><option value="1">logarithmic</option><option value="0">constant</option><option value="2">linear</option></select>
+    </label>
+    <button id="p-run">sweep</button>
+    <span class="dim" id="plateau-status">not yet run</span>
+  </div>
+  <div class="panel-grid single">
+    <canvas id="c-plateau"></canvas>
+  </div>
+</section>
+
+<footer>
+  <p><span id="version">overtone-sim</span> · every number on this page is computed in your
+  browser by the same engine the tests run against · gradients verified against Yao.jl to
+  1e-12 · <a href="https://github.com/Anbu-00001/Overtone">source</a></p>
+</footer>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
