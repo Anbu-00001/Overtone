@@ -25,6 +25,7 @@ let wfc = null;
 let tiles = null;
 let lastCollapse = 0;
 let raceData = null;
+let frameCost = null;
 
 function config() {
   return {
@@ -115,12 +116,20 @@ function buildLanding() {
   landing($('c-landing'), land, 0);
 }
 
+// Part I 8's 60fps target is a claim about *work per frame*, not about the frame rate a
+// headless browser reports -- requestAnimationFrame is clamped to the display clock whether
+// the page is doing anything or not, so frame deltas measure the clock. What is meaningful
+// is the time the step-and-draw block actually costs against the 16.7 ms budget, and that is
+// what this measures and reports.
 function loop(t) {
   if (running && t - lastStep > 60) {
     lastStep = t;
+    const t0 = performance.now();
     lab.train_steps(2);
     syncReadouts();
     draw();
+    frameCost = frameCost === null ? performance.now() - t0 : 0.9 * frameCost + 0.1 * (performance.now() - t0);
+    $('r-frame').textContent = frameCost.toFixed(2);
   }
   if (hero) heroFrame(t);
   closureFrame(t);
@@ -147,7 +156,7 @@ function heroFrame(t) {
   $('hero-return').textContent = hero.lab.exact_return().toFixed(4);
   // Part IV 5.1: the environment's frequency and the policy's scaling, as two tones. The
   // beat rate is their difference, so it falls to zero exactly as lambda locks on.
-  sound.update(3, hero.lab.lambda());
+  sound.update(hero.lab.sonification());
 }
 
 function startHero() {

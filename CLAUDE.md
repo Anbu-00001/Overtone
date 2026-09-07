@@ -4,9 +4,14 @@ Quantum RL instrumentation. A variational quantum circuit that encodes classical
 exactly a truncated Fourier series in that data (Schuld, Sweke & Meyer, PRA 103, 032430).
 This repo points that theorem at a reinforcement-learning policy in real time.
 
-Build specs live in `docs/spec/` — Parts I through VI. **Read the relevant part before
-touching a crate.** Part I is the spine; Parts II–V are companions that never replace it.
-Part III §12 ("Minimum viable Overtone") governs scope whenever a new panel suggests itself.
+Build specs live in `docs/spec/` — Parts I through VIII, plus the Part VI-A traps addendum.
+**Read the relevant part before touching a crate.** Part I is the spine; Parts II–V are
+companions that never replace it. Part III §12 ("Minimum viable Overtone") governs scope
+whenever a new panel suggests itself.
+
+**One exception to "companions never replace":** Part VII *does* replace Part VI. The arena
+is turn-based, the tab is `Orbit`, and Part VI's mechanics survive inside Part VII's seven
+rules as content. Do not build both (Part VII §10).
 
 ---
 
@@ -77,6 +82,8 @@ crates/
 ├── overtone-mps/    bond spectra, truncation, the dequantization test
 ├── overtone-walk/   discrete-time quantum walks, substrates, the transport exponent
 ├── overtone-wfc/    Wave Function Collapse and its Shannon entropy (not physics)
+├── overtone-qd/     MAP-Elites over policy agents: the Menagerie archive
+├── overtone-graph/  maze Laplacian, the shared eigenbasis, linearly-solvable MDPs
 ├── overtone-cli/    native trainer, `predict`, `dequantize`; emits JSONL traces
 └── overtone-wasm/   wasm-bindgen surface for the browser
 ```
@@ -92,6 +99,10 @@ Dependency direction is one-way and load-bearing:
 - `overtone-gsim` depends on `lie` and `rl`; `overtone-mps` depends on `sim` and `rl`.
 - `overtone-walk` depends on `sim` only. `overtone-wfc` depends on nothing — it is not
   physics and must never import a physics crate, or the panel's whole point is lost.
+- `overtone-qd` sits above `rl`, `spec`, `lie` and `mps`, because a behaviour descriptor is
+  a measurement and every measurement it needs already exists below it.
+- `overtone-graph` depends on `mps` for the eigensolver and on `wfc` for a maze to put a
+  Laplacian on. It is the one place a physics crate may import `wfc`, and only for its grid.
 - `overtone-wasm` is a thin FFI shim. **If it contains an `if` statement about physics,
   that logic is in the wrong crate.**
 
@@ -166,11 +177,42 @@ Credibility is the scarce resource in this field.
 - The 100-qubit g-sim claim never appears without its caveat in the same paragraph:
   polynomial `dim(g)` is why it trains *and* why it is classically simulable.
 - Do not interpolate animation frames. Discrete time is discrete.
-- **Every mechanic in `Braid` must be a theorem** (Part VI §0). Nothing is invented for
-  balance. No HP, damage, XP or cooldowns — if a quantity is not a physical observable it
-  is not on screen. If the arena is unbalanced, that is a finding, not a bug to tune.
-- `Lab` is the default tab. `Braid` never precedes it in the nav, and is never the landing
+- **Every mechanic in `Orbit` must be a theorem** (Part VI §0, carried into Part VII).
+  Nothing is invented for balance. No HP, damage, XP or cooldowns — if a quantity is not a
+  physical observable it is not on screen. If the arena is unbalanced, that is a finding,
+  not a bug to tune.
+- `Lab` is the default tab. `Orbit` never precedes it in the nav, and is never the landing
   page (Part VI §5.5).
+- **Do not add maze to add depth** (Part VII §0, §12). More states is the cheap axis and it
+  moves depth toward zero. An endless maze scores enormous space complexity and near-zero
+  decision complexity, which is Snakes and Ladders. Every instinct to expand is checked
+  against the measured `d` first.
+- **Do not build the Orbit interface before `d` is measured** (Part VII §12). Phase 9 is
+  headless on purpose. If the ladder is flat the interface is wasted work, and by then you
+  will be attached to it.
+- **Do not soften the checkmate predicate into a score threshold** (Part VII §12). It is
+  structural: no unitary in `g` reaches a safe state. The predicate must be **sound** — never
+  a false checkmate — and its incompleteness is a measured, reported number, not a reason to
+  weaken it.
+- **The generator basis is six to eight types.** Chess has six and a library of literature.
+  Rule count and depth are close to unrelated.
+- **Do not hide the complexity dial** (Part VII §12). It is the most remarkable property the
+  game has and the only one no other game can claim — and per Part VIII §6 it controls
+  verifiability as well as depth.
+- **Do not claim depth before measuring it** (Part VII §12). `d` is a *count of ladder steps*
+  against a declared step unit, relative to a declared strategy language — not a length in
+  orders of magnitude, and there are no published values for any game to compare against.
+- **Agents are declarative, never executable** (Part VIII §2). A submission is a spec with
+  trained weights as data. This eliminates arbitrary code execution rather than sandboxing
+  it. The moment executable agents are accepted, the project owns a sandboxing problem
+  forever.
+- **No server** (Part VIII §3, §11). Tier 0 is URL correspondence, Tier 1 is GitHub Actions,
+  Tier 2 is peer-to-peer and speculative. Tier 3 is a standing no.
+- **Do not let the `.otn` notation drift** (Part VIII §9). Freeze it after the Phase 9
+  retuning settles, version it explicitly in the header, and keep a replay-compatibility
+  test in CI. The format is the product.
+- **Call it the ladder, not the leaderboard** (Part VIII §11). It is how `d` gets measured,
+  and the framing is what keeps it a research instrument rather than a growth feature.
 - **A trap is a per-cell parameter, never an object** (Part VI-A §7). The moment there is a
   `Trap` struct with a lifecycle, the codebase has become a game engine and the physics is
   decoration on it. Traps live in the maze's seeded per-cell hash: flux, coin id, disorder
@@ -187,3 +229,24 @@ Credibility is the scarce resource in this field.
 - **Never autoplay audio** (Part IV §5.1). Off by default, one obvious toggle, instant mute.
 - **Do not claim WFC is quantum** (Part IV §7). The entire value of that panel is the
   contrast between a borrowed metaphor and the literal thing.
+- **Solve the LMDP in log space, never in `z`.** The desirability at hop distance `d` is
+  about `exp(-rho d)`, so `f64` underflows once `rho * diameter` passes ~745 — while accuracy
+  needs `rho > ~1.4 * diameter`, since the error per hop is `ln(degree)/rho`. Past a diameter
+  near 23 no `rho` satisfies both. Iterating `v` with a stable log-sum-exp has no floor and
+  the error falls cleanly as `1/rho`. Todorov's own "not too large" caveat is an artifact of
+  the representation.
+- **A convergence tolerance must be applied at the scale of the quantity.** An absolute
+  tolerance on `z` halts the LMDP iteration after two steps while the far end of the graph is
+  200 orders of magnitude from its answer. Converge on `log z`. The same error shape has now
+  appeared twice; check the dynamic range before choosing a tolerance.
+- **`e^(-Lt)` versus `e^(-iAt)` is two operators, not one character** (Part V §1.3). They
+  agree up to a global phase only on a *regular* graph, and a maze is not one. Use `L` on
+  both sides or the panel's claim is false.
+- **MAP-Elites is not a way out of a barren plateau, and Part IV §4 is wrong to say it is.**
+  Arrasmith et al., Quantum 5, 558 (2021) prove that cost-function *differences* are
+  exponentially suppressed in a plateau, and MAP-Elites decides by comparing fitness, so the
+  theorem covers it. Phase 8 cites the same paper for "all four optimisers flatline", so the
+  original justification would have put two contradictory claims in one repository. The
+  honest reason for the archive is diversity: at a matched budget it reached `J = 0.502`
+  against a single-peak search's `0.403`, by holding structurally different agents. Say that
+  instead.

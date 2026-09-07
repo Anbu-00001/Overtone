@@ -13,8 +13,6 @@ let ctx = null;
 let env = null;
 let policy = null;
 
-const BASE = 110; // A2, so a frequency of 3 lands near an audible A4.
-
 export function enabled() {
   return ctx !== null;
 }
@@ -36,8 +34,8 @@ export function toggle() {
     o.start();
     return o;
   };
-  env = mk(BASE);
-  policy = mk(BASE);
+  env = mk(220);
+  policy = mk(220);
   return true;
 }
 
@@ -49,11 +47,13 @@ export function stop() {
   policy = null;
 }
 
-// Two tones: the environment's frequency k, and the policy's reachable frequency lambda*C.
-// When they differ you hear the beat; when they coincide the beat stops.
-export function update(k, reach) {
+// Two tones: the environment's frequency, and the policy's input scaling. When they differ
+// you hear the beat; when they coincide the beat stops. Both frequencies come from Rust --
+// the mapping carries a claim about what a listener hears, and a claim in the renderer is a
+// claim nothing can test.
+export function update(tones) {
   if (!ctx) return;
   const now = ctx.currentTime;
-  env.frequency.setTargetAtTime(BASE * k, now, 0.05);
-  policy.frequency.setTargetAtTime(BASE * Math.max(reach, 0.2), now, 0.05);
+  env.frequency.setTargetAtTime(tones[0], now, 0.05);
+  policy.frequency.setTargetAtTime(tones[1], now, 0.05);
 }

@@ -20,14 +20,15 @@ polynomial, and a polynomial `dim(g)` is exactly the condition for having no bar
 The circuits that train are the circuits that are classically simulable. That tension is the
 live question in the field, and this repository names it rather than routing around it.
 
-**Status: Phase 7 of 9.** The simulator, both gradient paths, the RL loop, the LP ceiling,
+**Status: Phase 8 of 11, partial.** The simulator, both gradient paths, the RL loop, the LP ceiling,
 the spectral instrument, the browser demo, the closure engine, g-sim, the dequantization
 test, the substrate worlds and the transport instrument are built and verified — 31 gates,
 green. Phase 5, the lattice, is **partial**: Part IV's worlds cannot be measured without a
 walk, so the one-dimensional core of Part II's M6 and M7 was built early, and what remains
 is everything two-dimensional. See [docs/PHASES.md](docs/PHASES.md) for the plan and
-[docs/spec/](docs/spec/) for the full build specification, Parts I to VI plus the VI-A traps
-addendum.
+[docs/spec/](docs/spec/) for the full build specification, Parts I to VIII plus the VI-A
+traps addendum. Part VII supersedes Part VI: the arena is turn-based, the tab is `Orbit`,
+and it is not built until its depth has been measured headless.
 
 ---
 
@@ -244,6 +245,16 @@ property of the state. WFC has no phase, so nothing in it can ever interfere.
 | Conditioning pays only on periodic structure | `0.134` vs `0.118` | — | `overtone-walk/tests/transport.rs` |
 | The sigil depends on the algebra alone | exact | exact | `overtone-lie/tests/published_dimensions.rs` |
 | WFC terminates seam-consistent on every seed | 20 seeds | exact | `overtone-wfc/tests/collapse.rs` |
+| The archive beats a single-peak search | `0.502` vs `0.403` | — | `overtone-qd/tests/archive.rs` |
+| Every archive descriptor is measured, not authored | responds to the genome | exact | `overtone-qd/tests/archive.rs` |
+| The archive is reproducible from its seed | bit-for-bit | exact | `overtone-qd/tests/archive.rs` |
+| The sonification beat rate is the detuning | `110·\|k−λ\|`, → 0 | `1e-9` | `overtone-wasm/src/lib.rs` |
+| Cycle Laplacian spectrum matches the closed form | `< 1e-10` | `1e-10` | `overtone-graph/tests/eigenbasis.rs` |
+| Diffusion conserves probability, interference norm | `< 1e-9` | `1e-9` | `overtone-graph/tests/eigenbasis.rs` |
+| The eigensolve recovers shortest paths exactly | every vertex | exact | `overtone-graph/tests/eigenbasis.rs` |
+| The optimal policy descends the value function | every vertex | exact | `overtone-graph/tests/eigenbasis.rs` |
+| Policies superpose linearly | `4e-22` | `1e-12` | `overtone-graph/tests/eigenbasis.rs` |
+| The LMDP error falls as `1/rho` in log space | `0.634 → 0.0063` | ratio 8–12 | `overtone-graph/tests/eigenbasis.rs` |
 | Native and wasm32 trajectories agree | `5.55e-16` | `1e-13` | `scripts/wasm_determinism.sh` |
 | The page boots and reads from the engine | headless Chrome | — | `.github/workflows/ci.yml` |
 | JavaScript stays a renderer | 762 lines | 800 | `scripts/check_js_budget.sh` |
@@ -541,10 +552,12 @@ crates/overtone-gsim/   Lie-algebraic simulation and gradients      (Phase 6)
 crates/overtone-mps/    bond spectra and the dequantization test    (Phase 6)
 crates/overtone-walk/   quantum walks, substrates, transport exponent (Phase 7)
 crates/overtone-wfc/    Wave Function Collapse, which is not physics (Phase 7)
+crates/overtone-qd/     MAP-Elites: the Menagerie archive             (Phase 7)
+crates/overtone-graph/  maze Laplacian, eigenbasis, LMDP              (Phase 8)
 crates/overtone-cli/    native trainer, predict, dequantize
 crates/overtone-wasm/   wasm-bindgen surface                       (Phase 4)
 lab/                    Yao.jl oracle and heavy sweeps
-docs/spec/              the build specification, Parts I to VI and VI-A
+docs/spec/              the build specification, Parts I to VIII and VI-A
 ```
 
 The dependency direction is one-way and load-bearing. `overtone-sim` knows nothing about

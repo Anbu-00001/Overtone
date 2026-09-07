@@ -9,6 +9,8 @@ members = [
     "crates/overtone-mps",
     "crates/overtone-walk",
     "crates/overtone-wfc",
+    "crates/overtone-graph",
+    "crates/overtone-qd",
     "crates/overtone-cli",
     "crates/overtone-wasm",
 ]
@@ -29,6 +31,8 @@ overtone-gsim = { path = "crates/overtone-gsim" }
 overtone-mps = { path = "crates/overtone-mps" }
 overtone-walk = { path = "crates/overtone-walk" }
 overtone-wfc = { path = "crates/overtone-wfc" }
+overtone-qd = { path = "crates/overtone-qd" }
+overtone-graph = { path = "crates/overtone-graph" }
 # No entropy source, deliberately: every random draw in this workspace is seeded
 # explicitly (Part I 5, determinism). Dropping default features removes the getrandom
 # dependency entirely, which both enforces that invariant and lets the core crates build

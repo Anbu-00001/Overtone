@@ -1,0 +1,12 @@
+[package]
+name = "overtone-graph"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Maze graphs, the shared eigenbasis, and linearly-solvable MDPs"
+
+[dependencies]
+overtone-mps.workspace = true
+overtone-wfc.workspace = true

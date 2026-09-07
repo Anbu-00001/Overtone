@@ -24,6 +24,21 @@ use overtone_spec::plateau::{fit_exponential, sweep, CostLocality, DepthPolicy};
 use overtone_spec::spectrum_of;
 use rand_chacha::ChaCha8Rng;
 
+/// A2, so that a frequency of three lands near an audible A4. Any base works; this one keeps
+/// the whole reachable comb inside the range where human pitch discrimination is sharpest,
+/// which is the entire reason Part IV 5.1 expects the ear to beat the eye here.
+const SONIFICATION_BASE: f64 = 110.0;
+
+/// `[environment, policy, beat]` in hertz. A free function so the claim it carries can be
+/// tested directly over the whole range of detunings, rather than only at the few values a
+/// constructor happens to reach.
+fn sonification_tones(k: usize, lambda: f64) -> [f64; 3] {
+    let env = SONIFICATION_BASE * k as f64;
+    // Never zero hertz: a silent tone would misreport a policy that has merely scaled down.
+    let policy = SONIFICATION_BASE * lambda.abs().max(0.05);
+    [env, policy, (env - policy).abs()]
+}
+
 /// Gate kinds, as a numeric code for the circuit panel. JavaScript switches on the number
 /// rather than parsing a string.
 const GATE_RX: f64 = 0.0;
@@ -176,6 +191,21 @@ impl Lab {
     }
 
     /// Whether `lambda` is trainable. Part I 6.2: this is a protagonist, not a detail.
+    /// The two tones the sonification plays: the environment's frequency and the policy's
+    /// input scaling, in hertz.
+    ///
+    /// Part IV 5.1. The mapping lives here rather than in JavaScript for the same reason
+    /// every other number does — it carries a claim, and a claim in the renderer cannot be
+    /// tested. The claim is that the **beat rate is the detuning**: two tones an interval
+    /// apart beat at the difference of their frequencies, so what a listener hears slow to a
+    /// stop as `lambda` approaches `k` is `SONIFICATION_BASE * |k - lambda|` going to zero.
+    /// That is why the agent can be heard locking on before the bar chart shows it.
+    ///
+    /// Returns `[environment, policy, beat]`.
+    pub fn sonification(&self) -> Vec<f64> {
+        sonification_tones(self.env.k, self.lambda()).to_vec()
+    }
+
     pub fn lambda_trainable(&self) -> bool {
         !self.policy.ansatz.lambda_range().is_empty()
     }
@@ -949,5 +979,48 @@ impl Wfc {
             .iter()
             .flat_map(|t| [t.left as f64, t.right as f64, t.up as f64, t.down as f64])
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Part IV 5.1's audible claim, made testable by living in Rust: the beat rate is the
+    /// detuning, so it falls to zero exactly when the policy's scaling reaches the
+    /// environment's frequency. A headless browser cannot verify a beat; this can.
+    #[test]
+    fn the_beat_rate_is_the_detuning_and_vanishes_on_resonance() {
+        let k = 3;
+        let mut previous = f64::INFINITY;
+        for step in 0..=20 {
+            let lambda = 1.0 + (k as f64 - 1.0) * step as f64 / 20.0;
+            let s = sonification_tones(k, lambda);
+            assert!((s[0] - SONIFICATION_BASE * k as f64).abs() < 1e-12);
+            assert!((s[1] - SONIFICATION_BASE * lambda).abs() < 1e-9);
+            // The beat is the difference of the two tones, and it closes monotonically.
+            assert!((s[2] - (s[0] - s[1]).abs()).abs() < 1e-12);
+            assert!(s[2] < previous + 1e-9, "beat rose at lambda = {lambda}");
+            previous = s[2];
+        }
+        // On resonance the two tones coincide and the beat stops.
+        assert!(sonification_tones(k, k as f64)[2] < 1e-9);
+        // And the method a browser calls is the same function, so the test covers it.
+        let lab = Lab::new(2, 1, k, 0, true, true, 1.0, 0.05, 7);
+        assert_eq!(
+            lab.sonification(),
+            sonification_tones(k, lab.lambda()).to_vec()
+        );
+    }
+
+    /// A silent policy would be a lie about a trained agent, so the tone never collapses to
+    /// zero hertz even when lambda is driven to zero.
+    #[test]
+    fn the_policy_tone_stays_audible_at_zero_scaling() {
+        assert!(sonification_tones(3, 0.0)[1] > 0.0);
+        assert!(
+            sonification_tones(3, -2.0)[1] > 0.0,
+            "a negative scaling still sounds"
+        );
     }
 }
