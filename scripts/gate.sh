@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The gate. Every claim in the README has a line here that fails when it stops being true.
 #
-# Run from the repository root. Phases 1-6.
+# Run from the repository root. Phases 1-7.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
@@ -30,14 +30,14 @@ expect() {
   fi
 }
 
-echo "PHASE 1-6 GATE"
+echo "PHASE 1-7 GATE"
 
 run "cargo fmt --check"                cargo fmt --all -- --check
 run "clippy -D warnings"               cargo clippy --workspace --all-targets -- -D warnings
 run "clippy (parallel)"                cargo clippy -p overtone-sim --features parallel --all-targets -- -D warnings
 run "cargo test --workspace"           cargo test --workspace
 run "cargo test (parallel)"            cargo test -p overtone-sim --features parallel
-for c in sim rl spec lie gsim; do
+for c in sim rl spec lie gsim walk wfc; do
   run "overtone-$c -> wasm32"          cargo build -p "overtone-$c" --target wasm32-unknown-unknown
 done
 run "wasm-pack build"                  wasm-pack build crates/overtone-wasm --target web --out-dir pkg --release
@@ -65,6 +65,20 @@ expect "predict on the TFIM chain" \
   'dim\(g\) +45' \
   cargo run --release -q -p overtone-cli -- predict --family tfim --qubits 5
 
+# Phase 7. The transport exponent is the readout that makes a world an experiment rather
+# than a skin, so the gate asserts the numbers the README prints, not merely that it ran.
+expect "clean lattice is ballistic" \
+  'periodic +1\.000 +1\.000' \
+  cargo run --release -q -p overtone-walk --example transport
+
+expect "Rudin-Shapiro saturates, Fibonacci does not" \
+  'Rudin-Shapiro +-?0\.0[0-9]+ +0\.1' \
+  cargo run --release -q -p overtone-walk --example transport
+
+expect "conditioning pays only on periodic structure" \
+  'two-periodic +0\.0197 +0\.0000 +0\.13' \
+  cargo run --release -q -p overtone-walk --example transport
+
 # The page must boot and populate its readouts from the engine, Closure chapter included.
 if command -v google-chrome >/dev/null 2>&1; then
   mkdir -p web/pkg
@@ -77,7 +91,8 @@ if command -v google-chrome >/dev/null 2>&1; then
         --dump-dom http://localhost:8791/index.html 2>/dev/null)
   kill "$server" >/dev/null 2>&1
   for check in 'id="loading"!' '<b id="r-ceiling">[0-9]+</b>' '<b id="hero-lambda">[0-9]' \
-               '<b id="cl-dim">28</b>' '<b id="cl-var">0\.1071</b>'; do
+               '<b id="cl-dim">28</b>' '<b id="cl-var">0\.1071</b>' \
+               '<b id="mn-beta">0\.827</b>' '<b id="mn-regime">superdiffusive</b>'; do
     if [ "${check: -1}" = "!" ]; then
       if grep -q "${check%!}" <<<"$dom"; then
         printf '  %-42s FAIL\n' "page boots (no loading state)"; failed=$((failed + 1))

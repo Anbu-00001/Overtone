@@ -184,3 +184,47 @@ fn commuting_blocks_are_found_where_they_are_visible_in_the_pauli_basis() {
     let g = closure_unbounded(&family::ising(6), 6);
     assert_eq!(components(&g).len(), 5);
 }
+
+#[test]
+fn the_sigil_is_a_deterministic_function_of_the_algebra_and_nothing_else() {
+    use overtone_lie::Sigil;
+
+    // Part IV 2.1 and 7. The same algebra reached through a different generating set must
+    // produce the identical mark, or the mark is a picture of the generators rather than of
+    // the algebra -- and then it is decoration.
+    let n = 5;
+    let a = closure_unbounded(&family::tfim(n), n);
+    let mut shuffled = family::tfim(n);
+    shuffled.reverse();
+    let b = closure_unbounded(&shuffled, n);
+    assert_eq!(a.dim(), b.dim());
+
+    let sa = Sigil::of(&a);
+    let sb = Sigil::of(&b);
+    assert_eq!(sa.to_flat().len(), sb.to_flat().len());
+    for (p, q) in sa.to_flat().iter().zip(sb.to_flat()) {
+        assert!((p - q).abs() < 1e-15, "sigil depended on generator order");
+    }
+
+    // And different algebras must look different. The Heisenberg chain reaches every
+    // string; the transverse-field Ising chain reaches a quadratic slice of them.
+    let h = Sigil::of(&closure_unbounded(&family::heisenberg(n), n));
+    assert!(h.dim > sa.dim * 4, "{} vs {}", h.dim, sa.dim);
+    // Both reach weight n -- the transverse-field Ising algebra contains Jordan-Wigner
+    // strings that span the register, so the *number* of rings does not separate them. What
+    // does is how the mass is distributed across those rings: an algebra containing every
+    // string sits far out, one containing a quadratic slice stays nearer the centre.
+    let mean_radius =
+        |s: &Sigil| s.spokes.iter().map(|k| k.radius).sum::<f64>() / s.spokes.len() as f64;
+    assert!(
+        mean_radius(&h) > mean_radius(&sa) + 0.1,
+        "mean radius {} vs {}",
+        mean_radius(&h),
+        mean_radius(&sa)
+    );
+
+    // su(2)^(+n) is n commuting blocks, and the sigil records that as its symmetry order.
+    let s = Sigil::of(&closure_unbounded(&family::single_qubit_only(n), n));
+    assert_eq!(s.blocks, n);
+    assert_eq!(s.rings, 1, "single-qubit generators reach weight one only");
+}

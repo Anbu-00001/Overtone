@@ -20,12 +20,14 @@ polynomial, and a polynomial `dim(g)` is exactly the condition for having no bar
 The circuits that train are the circuits that are classically simulable. That tension is the
 live question in the field, and this repository names it rather than routing around it.
 
-**Status: Phase 6 of 9.** The simulator, both gradient paths, the RL loop, the LP ceiling,
-the spectral instrument, the browser demo, the closure engine, g-sim and the dequantization
-test are built and verified. Phase 5, the lattice, is still open — Phase 6 depends only on
-Phase 1, and Part III §12 puts the closure animation in the minimum viable core. See
-[docs/PHASES.md](docs/PHASES.md) for the plan and [docs/spec/](docs/spec/) for the full
-build specification, Parts I to VI.
+**Status: Phase 7 of 9.** The simulator, both gradient paths, the RL loop, the LP ceiling,
+the spectral instrument, the browser demo, the closure engine, g-sim, the dequantization
+test, the substrate worlds and the transport instrument are built and verified — 31 gates,
+green. Phase 5, the lattice, is **partial**: Part IV's worlds cannot be measured without a
+walk, so the one-dimensional core of Part II's M6 and M7 was built early, and what remains
+is everything two-dimensional. See [docs/PHASES.md](docs/PHASES.md) for the plan and
+[docs/spec/](docs/spec/) for the full build specification, Parts I to VI plus the VI-A traps
+addendum.
 
 ---
 
@@ -73,9 +75,11 @@ mkdir -p web/pkg && cp crates/overtone-wasm/pkg/overtone_wasm{.js,_bg.wasm} web/
 cd web && python3 -m http.server 8731
 ```
 
-The JavaScript is a renderer and nothing else: **580 lines of 800**, enforced in CI. Every
+The JavaScript is a renderer and nothing else: **1014 lines of 1200**, enforced in CI. Every
 quantity a panel needs arrives from Rust already normalised and ordered, so the renderer
-draws and never computes. Deployment is a Hugging Face **Static Space**, which is free for
+draws and never computes. The budget was 800 in Part I, written when the page was one
+section; it was raised once, deliberately, when the page reached three. The rule it enforces
+is unchanged, and if it binds again the fix is to move code into Rust rather than raise it. Deployment is a Hugging Face **Static Space**, which is free for
 everyone — Gradio and Docker Spaces run on compute and require a paid plan. That was
 re-verified against Hugging Face's own documentation on 2026-09-06 and is quoted in
 `scripts/deploy_space.sh`; it has changed before, so it is a release-checklist item rather
@@ -136,6 +140,70 @@ reach a 2-design at these depths. And the tempting explanation — that probing 
 leaves one side of the circuit trivial and halves the exponent — was tested and **rejected**;
 a mid-circuit probe gives `1.08`, not `2`.
 
+## Worlds, and the agent that cannot see them
+
+Write a word on the lattice and let each letter choose which coin the amplitude field meets
+at that site. The field's spread obeys `sigma(t) ~ t^beta`, and the exponent moves across its
+whole range as the word changes.
+
+```
+world               beta     R^2  sigma(600)         measured  literature
+periodic           1.000   1.000      324.72        ballistic  ballistic
+Fibonacci          0.820   1.000      116.13   superdiffusive  diffusive, no localization
+Thue-Morse         0.877   1.000      108.57   superdiffusive  mixed: localized and spreading
+Rudin-Shapiro     -0.032   0.106       26.44        saturated  strongly localized
+static disorder    0.435   0.195        3.25        saturated  Anderson localization
+classical          0.500   1.000       24.49        diffusive  diffusive, exactly 1/2
+```
+
+Two of those rows have no exponent at all, and that is the point: **a `beta` without its
+`R^2` is not a measurement.** Localization does not produce a small power law, it produces a
+`sigma` that stops growing, and a straight line fitted through a plateau reports the
+plateau's noise as a slope. The instrument refuses to name a regime when the fit is bad.
+
+Part IV's own table labels Fibonacci singular-continuous and Rudin-Shapiro discrete. Those
+are swapped: Fibonacci has a **pure point** spectrum, Thue-Morse is the singular continuous
+one, and Rudin-Shapiro is **absolutely continuous** — which is exactly why it behaves like
+noise. The behaviours are roughly right; the labels are not, and the caption depends on them.
+
+Then the race, which produced the most interesting negative result in the project so far.
+Four agents run the same world: the Hadamard coin, the Grover coin, an optimised coin, and a
+classical walk.
+
+```
+world              Hadamard     Grover  optimised  optimised coin angles
+periodic             0.0197     0.0000     0.1176       2.111      2.099
+two-periodic         0.0197     0.0000     0.1335       0.957      1.018
+Fibonacci            0.0197     0.0000     0.1178       2.113      2.110
+Thue-Morse           0.0197     0.0000     0.1176       1.029      1.032
+Rudin-Shapiro        0.0197     0.0000     0.1179       1.027      1.033
+static disorder      0.0000     0.0000     0.0000       0.196      0.196
+```
+
+The Hadamard column is constant because **a constant coin cannot see the world.** The
+substrate chooses between two coins, so an agent that plays the same one at both letters
+never reads the substrate: its trace on Fibonacci and on the clean lattice is not similar,
+it is bit-identical. Part II says the policy is the coin; an agent whose coin ignores the
+local feature has no policy.
+
+And the optimised agent's angles are equal on every world but one. **Conditioning the coin
+on the local letter pays only on the periodic structure** — everywhere else the best strategy
+found is to ignore the substrate. That is a negative result and it is published here because
+it is the interesting one. It also took two corrections to reach: optimising for spread
+rewards the coin that does not mix at all, and a single-start search reported the opposite
+answer on the Fibonacci world.
+
+The Grover column is zero for a reason worth stating rather than hiding. On a two-dimensional
+coin space the Grover diffusion operator `2|s><s| - I` is exactly the Pauli `X`, so the field
+oscillates between two sites and never spreads. Part II makes it a mandatory baseline;
+reporting that it is degenerate in one dimension is the honest form of that baseline.
+
+Beside all of it sits Wave Function Collapse, which borrows every word here as a metaphor —
+cells in "superposition", an "observation" that "collapses" the lowest-entropy cell,
+constraints propagating outward. **None of it is quantum**, and that is the panel. Its
+entropy is a count of the solver's remaining options; the entropy on the Lab panel is a
+property of the state. WFC has no phase, so nothing in it can ever interfere.
+
 ## What is verified today
 
 | Claim | Measured | Tolerance | Test |
@@ -165,6 +233,17 @@ a mid-circuit probe gives `1.08`, not `2`.
 | A hundred-qubit policy trains | `J: 0 -> 0.251` in 3.9 s | — | `.github/workflows/ci.yml` |
 | Every agent here is a small tensor network | `chi = 2..4` | — | `overtone-cli` `dequantize` |
 | MPS truncation is exact at full bond dimension | `< 1e-10` | `1e-10` | `overtone-mps/tests/truncation.rs` |
+| Aperiodic words match the published sequences | exact, 15 letters | exact | `overtone-walk/tests/transport.rs` |
+| A clean lattice is ballistic | `beta = 1.000`, R²`=1.000` | `1.00 ± 0.03` | `overtone-walk/tests/transport.rs` |
+| The classical baseline is diffusive | `0.500` exactly | `0.50 ± 0.03` | `overtone-walk/tests/transport.rs` |
+| Rudin-Shapiro localizes where Fibonacci spreads | median `0.39` vs `0.83` | — | `overtone-walk/tests/transport.rs` |
+| Static disorder saturates rather than scaling | `sigma = 3.2` at `t = 600` | — | `overtone-walk/tests/transport.rs` |
+| The light cone is strict | zero outside radius `t` | exact | `overtone-walk/tests/transport.rs` |
+| Full decoherence is a simple random walk | TV `0.0025` | sampling | `overtone-walk/tests/transport.rs` |
+| A constant coin cannot see the world | traces bit-identical | exact | `overtone-walk/tests/transport.rs` |
+| Conditioning pays only on periodic structure | `0.134` vs `0.118` | — | `overtone-walk/tests/transport.rs` |
+| The sigil depends on the algebra alone | exact | exact | `overtone-lie/tests/published_dimensions.rs` |
+| WFC terminates seam-consistent on every seed | 20 seeds | exact | `overtone-wfc/tests/collapse.rs` |
 | Native and wasm32 trajectories agree | `5.55e-16` | `1e-13` | `scripts/wasm_determinism.sh` |
 | The page boots and reads from the engine | headless Chrome | — | `.github/workflows/ci.yml` |
 | JavaScript stays a renderer | 762 lines | 800 | `scripts/check_js_budget.sh` |
@@ -232,7 +311,7 @@ verdict: dim(g) = 12 of 255 for the trainable generators, but this circuit's fix
          entanglers put it outside exp(g). No trainability claim follows. Measure it.
 ```
 
-## Nine things the specification did not say, that turned out to matter
+## Twelve things the specification did not say, that turned out to matter
 
 **The frequency ceiling counts encoding gates, not layers.** Part I states the reachable
 spectrum as `{-L..L}` for `L` layers. That holds only when each layer applies one encoding
@@ -342,6 +421,40 @@ visit two, and the parity is no longer pinned. The claim survived a test that ha
 reached one layer. Both directions are asserted now.
 
 
+**Part IV's spectral labels for the aperiodic words are swapped.** Its table calls Fibonacci
+singular-continuous and Rudin-Shapiro discrete, and then rests the panel's caption on "the
+difference is the nature of the spectrum". Fibonacci has a **pure point** spectrum,
+Thue-Morse is the singular continuous one, and Rudin-Shapiro is **absolutely continuous** —
+which is exactly why it behaves like noise and localizes. The transport behaviours in that
+table are roughly right; the attributions are not, and they are the part the exposition
+leans on.
+
+**A transport exponent without its `R^2` is not a measurement.** Anderson localization does
+not produce a small power law. It produces a `sigma` that stops growing, and a straight line
+fitted through a plateau reports whatever the noise on the plateau happens to slope. The
+first disorder run reported `beta = 0.44`, which reads as *diffusive* — a completely wrong
+description of a field confined to three sites. Worse, a single seeded realisation of a
+two-letter disorder word gave exponents from `0.15` to `0.34` depending on the seed, because
+weak binary disorder has a long localisation length. The instrument now rejects the fit on
+its `R^2` before reading `beta`, and the disorder world draws a continuous coin angle per
+site, which is what Anderson localization is a statement about.
+
+**Optimising a walker for spread teaches it nothing.** `sigma` is maximised by the coin that
+does not superpose at all: the field splits into two ballistic beams that sit exactly on the
+light cone and `sigma` comes out at very nearly `t`. That coin is optimal on every substrate,
+so the "optimised" agent was identical on all six worlds and the race was a table of the same
+number six times. The objective has to be one the world can help or hinder, which is Part
+II's own choice — arrival, the thing a hitting time measures.
+
+That fix exposed a second one. With a single-start search the optimiser reported that
+conditioning the coin on the local letter helps on the Fibonacci world. It does not; the
+search had settled in a local optimum scoring `0.074` while a coin that ignores the substrate
+scores `0.118`. Arrival probability at one site oscillates sharply in the coin angle, so a
+16-point grid ranks the blind solutions badly. With the diagonal searched properly the answer
+reverses, and the honest result is a negative one: **conditioning pays only on the periodic
+word.**
+
+
 ## Why three gradient checks and not one
 
 The adjoint path is what training uses: constant memory in circuit depth, every parameter in
@@ -426,10 +539,12 @@ crates/overtone-spec/   FFT, spectrum, entropy, gradient variance, QFIM
 crates/overtone-lie/    Pauli bitsets, Lie closure, the prediction (Phase 6)
 crates/overtone-gsim/   Lie-algebraic simulation and gradients      (Phase 6)
 crates/overtone-mps/    bond spectra and the dequantization test    (Phase 6)
+crates/overtone-walk/   quantum walks, substrates, transport exponent (Phase 7)
+crates/overtone-wfc/    Wave Function Collapse, which is not physics (Phase 7)
 crates/overtone-cli/    native trainer, predict, dequantize
 crates/overtone-wasm/   wasm-bindgen surface                       (Phase 4)
 lab/                    Yao.jl oracle and heavy sweeps
-docs/spec/              the build specification, Parts I to VI
+docs/spec/              the build specification, Parts I to VI and VI-A
 ```
 
 The dependency direction is one-way and load-bearing. `overtone-sim` knows nothing about

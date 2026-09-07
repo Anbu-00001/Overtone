@@ -26,7 +26,9 @@ pub mod closure;
 pub mod family;
 pub mod pauli;
 pub mod predict;
+pub mod sigil;
 
 pub use closure::{closure, closure_unbounded, Algebra};
 pub use pauli::{PauliString, MAX_QUBITS};
 pub use predict::{Prediction, Scaling};
+pub use sigil::{Sigil, Spoke};

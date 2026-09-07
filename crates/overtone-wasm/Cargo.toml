@@ -16,6 +16,8 @@ overtone-rl = { path = "../overtone-rl" }
 overtone-spec = { path = "../overtone-spec" }
 overtone-lie.workspace = true
 overtone-gsim.workspace = true
+overtone-walk.workspace = true
+overtone-wfc.workspace = true
 rand.workspace = true
 rand_chacha.workspace = true
 wasm-bindgen = "0.2"

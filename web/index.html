@@ -186,6 +186,66 @@
   </p>
 </section>
 
+<main>
+<section class="prose">
+  <h2>Worlds, and the one number that separates them</h2>
+  <p>Write a word on the lattice — periodic, Fibonacci, Thue&#8211;Morse, Rudin&#8211;Shapiro,
+  or noise — and let each letter choose which coin the amplitude field meets at that site.
+  The field's spread obeys <span class="m">sigma(t) ~ t^beta</span>, and that exponent moves
+  across its whole range as the word changes: one for ballistic, a half for diffusive, and
+  no exponent at all when the field stops spreading and simply saturates.</p>
+  <p>The three aperiodic words are ordered by the nature of their spectrum. Fibonacci is pure
+  point and spreads; Thue&#8211;Morse is singular continuous and carries a localized component
+  alongside a spreading one; Rudin&#8211;Shapiro is absolutely continuous — the closest a
+  deterministic word gets to noise — and it is the one that localizes. Part IV's own table
+  attaches those spectra the other way round.</p>
+  <p>The race is the part that surprised us. Three of the four agents play the same coin at
+  every site, and an agent whose coin does not depend on the local letter cannot read the
+  world at all: its trace on Fibonacci and on the clean lattice is not similar, it is
+  identical. Only the periodic world repays conditioning on the letter. On the aperiodic ones
+  the best strategy found is to ignore the substrate entirely.</p>
+  <p>Beside it, Wave Function Collapse — which borrows every word here as a metaphor. Its
+  cells are in "superposition", its lowest-entropy cell is "observed", and its constraints
+  propagate. None of it is quantum. Its entropy is a count of the solver's remaining options;
+  the entropy on the Lab panel is a property of the state. That contrast is the panel.</p>
+</section>
+</main>
+
+<section class="instrument">
+  <div class="controls">
+    <label>world
+      <select id="mn-world">
+        <option value="0">periodic</option>
+        <option value="1">two-periodic</option>
+        <option value="2" selected>Fibonacci</option>
+        <option value="3">Thue-Morse</option>
+        <option value="4">Rudin-Shapiro</option>
+        <option value="5">static disorder</option>
+      </select>
+    </label>
+    <label>steps <input id="mn-steps" type="range" min="40" max="400" step="20" value="200"><b id="mn-steps-value">200</b></label>
+    <label>coin B <input id="mn-theta" type="range" min="10" max="170" value="60"><b id="mn-theta-value">60</b></label>
+    <label>seed <input id="mn-seed" type="number" value="7" min="0" max="99999"></label>
+    <button id="mn-wfc">re-collapse</button>
+    <label class="check"><input id="mn-sound" type="checkbox"> sonify</label>
+  </div>
+  <div class="panel-grid">
+    <canvas id="c-transport"></canvas>
+    <canvas id="c-field"></canvas>
+    <canvas id="c-race"></canvas>
+  </div>
+  <div class="panel-grid pair">
+    <canvas id="c-sigil"></canvas>
+    <canvas id="c-wfc"></canvas>
+  </div>
+  <p class="readouts">
+    <span>beta <b id="mn-beta">--</b></span>
+    <span>measured <b id="mn-regime">--</b></span>
+    <span>published <b id="mn-published">--</b></span>
+    <span class="dim">audio is off until you ask for it, and never autoplays</span>
+  </p>
+</section>
+
 <footer>
   <p><span id="version">overtone-sim</span> · every number on this page is computed in your
   browser by the same engine the tests run against · gradients verified against Yao.jl to

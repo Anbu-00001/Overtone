@@ -744,3 +744,210 @@ impl Landing {
             .fold(0.0, f64::max)
     }
 }
+
+#[wasm_bindgen]
+impl Closure {
+    /// The agent's sigil: `[angle, radius, x, y, z]` per basis element, sorted canonically.
+    ///
+    /// Part IV 2.1. A function of the algebra and nothing else -- not of the generating set,
+    /// not of the order the closure discovered elements in, and not of a name.
+    pub fn sigil(&self) -> Vec<f64> {
+        overtone_lie::Sigil::of(&self.algebra).to_flat()
+    }
+
+    /// Rings to draw: the largest Pauli weight in the algebra.
+    pub fn sigil_rings(&self) -> usize {
+        overtone_lie::Sigil::of(&self.algebra).rings
+    }
+
+    /// Blocks that commute elementwise -- the mark's rotational symmetry order.
+    pub fn sigil_blocks(&self) -> usize {
+        overtone_lie::Sigil::of(&self.algebra).blocks
+    }
+}
+
+/// The `Menagerie` tab: one world, four agents, and the transport exponent.
+///
+/// Part IV 3 makes the substrate a dial and `beta` the readout, so world selection is an
+/// experiment rather than a skin. Everything below is already fitted, already normalised,
+/// already ordered; the renderer draws it.
+#[wasm_bindgen]
+pub struct Menagerie {
+    substrate: overtone_walk::Substrate,
+    word: overtone_walk::Word,
+    steps: usize,
+    sigma: Vec<f64>,
+    fit: overtone_walk::PowerLaw,
+    theta_b: f64,
+}
+
+#[wasm_bindgen]
+impl Menagerie {
+    /// `world` is the code from `overtone_walk::Word`: 0 periodic, 1 two-periodic,
+    /// 2 Fibonacci, 3 Thue-Morse, 4 Rudin-Shapiro, 5 static disorder.
+    #[wasm_bindgen(constructor)]
+    pub fn new(world: u32, steps: usize, theta_b: f64, seed: u32) -> Menagerie {
+        let word = overtone_walk::Word::from_code(world);
+        let steps = steps.clamp(20, 600);
+        let substrate = overtone_walk::Substrate::new(word, steps, seed as u64);
+        let mut m = Menagerie {
+            substrate,
+            word,
+            steps,
+            sigma: Vec::new(),
+            fit: overtone_walk::fit_exponent(&[1.0, 1.0, 1.0], 1.0),
+            theta_b,
+        };
+        m.recompute();
+        m
+    }
+
+    fn recompute(&mut self) {
+        self.sigma = overtone_walk::sigma_trace(
+            &self.substrate,
+            &overtone_walk::Coin::hadamard(),
+            &overtone_walk::Coin::theta(self.theta_b),
+            overtone_walk::Run::coherent(self.steps),
+        );
+        self.fit = overtone_walk::fit_exponent(&self.sigma, 0.5);
+    }
+
+    pub fn steps(&self) -> usize {
+        self.steps
+    }
+
+    pub fn beta(&self) -> f64 {
+        self.fit.beta
+    }
+
+    pub fn r_squared(&self) -> f64 {
+        self.fit.r_squared
+    }
+
+    /// False when the trace saturates instead of following a power law, in which case
+    /// `beta` is the slope of noise on a plateau and must not be shown as an exponent.
+    pub fn is_power_law(&self) -> bool {
+        self.fit.is_power_law()
+    }
+
+    pub fn regime(&self) -> String {
+        overtone_walk::regime_of(&self.fit).to_string()
+    }
+
+    pub fn world_name(&self) -> String {
+        self.word.name().to_string()
+    }
+
+    pub fn world_regime(&self) -> String {
+        self.word.regime().to_string()
+    }
+
+    pub fn sigma_trace(&self) -> Vec<f64> {
+        self.sigma.clone()
+    }
+
+    /// `sqrt(t)`, the classical baseline, as a closed form rather than a simulation.
+    pub fn classical_trace(&self) -> Vec<f64> {
+        overtone_walk::classical_sigma(self.steps)
+    }
+
+    /// The probability at every site inside the light cone, left to right.
+    pub fn distribution(&self) -> Vec<f64> {
+        let mut w = overtone_walk::Walk::new(self.steps);
+        let (a, b) = (
+            overtone_walk::Coin::hadamard(),
+            overtone_walk::Coin::theta(self.theta_b),
+        );
+        for _ in 0..self.steps {
+            w.step(&self.substrate, &a, &b);
+        }
+        w.distribution().into_iter().map(|(_, p)| p).collect()
+    }
+
+    /// The substrate's letters over the light cone, as zeros and ones.
+    pub fn letters(&self) -> Vec<f64> {
+        (-(self.steps as i64)..=self.steps as i64)
+            .map(|x| self.substrate.letter(x) as f64)
+            .collect()
+    }
+
+    /// The race, flattened as `[beta, sigma_final, sees_world, angle_a, angle_b]` per
+    /// entrant, in the order Hadamard, Grover, optimised, classical.
+    pub fn race(&self) -> Vec<f64> {
+        overtone_walk::race(&self.substrate, self.steps)
+            .iter()
+            .flat_map(|e| {
+                let (a, b) = e.angles.unwrap_or((f64::NAN, f64::NAN));
+                [
+                    e.beta,
+                    *e.sigma.last().unwrap_or(&0.0),
+                    if e.sees_the_world { 1.0 } else { 0.0 },
+                    a,
+                    b,
+                ]
+            })
+            .collect()
+    }
+}
+
+/// The `Wfc` panel: Part IV 3.1's metaphor, kept beside the physics.
+#[wasm_bindgen]
+pub struct Wfc {
+    inner: overtone_wfc::Wfc,
+}
+
+#[wasm_bindgen]
+impl Wfc {
+    #[wasm_bindgen(constructor)]
+    pub fn new(width: usize, height: usize, seed: u32) -> Wfc {
+        Wfc {
+            inner: overtone_wfc::Wfc::new(width.clamp(2, 64), height.clamp(2, 64), seed as u64),
+        }
+    }
+
+    pub fn width(&self) -> usize {
+        self.inner.width
+    }
+
+    pub fn height(&self) -> usize {
+        self.inner.height
+    }
+
+    /// One observation plus propagation. Returns false when the grid is fully collapsed.
+    pub fn step(&mut self) -> bool {
+        self.inner.step().is_some()
+    }
+
+    pub fn total_entropy(&self) -> f64 {
+        self.inner.total_entropy()
+    }
+
+    pub fn entropy_trace(&self) -> Vec<f64> {
+        self.inner.entropy_trace().to_vec()
+    }
+
+    pub fn contradictions(&self) -> usize {
+        self.inner.contradictions()
+    }
+
+    /// Per cell: the tile index if collapsed, otherwise `-1 - options_remaining`, so the
+    /// renderer can shade a cell by how undecided it still is without a second call.
+    pub fn cells(&self) -> Vec<f64> {
+        (0..self.inner.height)
+            .flat_map(|y| (0..self.inner.width).map(move |x| (x, y)))
+            .map(|(x, y)| match self.inner.tile_at(x, y) {
+                Some(t) => t as f64,
+                None => -1.0 - self.inner.options_at(x, y).count_ones() as f64,
+            })
+            .collect()
+    }
+
+    /// The eight tiles as `[left, right, up, down]` sockets, so the renderer draws pipes
+    /// from the tileset rather than from a hard-coded copy of it.
+    pub fn tileset() -> Vec<f64> {
+        overtone_wfc::TILES
+            .iter()
+            .flat_map(|t| [t.left as f64, t.right as f64, t.up as f64, t.down as f64])
+            .collect()
+    }
+}

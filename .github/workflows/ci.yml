@@ -50,6 +50,9 @@ jobs:
           # g-sim both have to cross to wasm32.
           cargo build -p overtone-lie --target wasm32-unknown-unknown
           cargo build -p overtone-gsim --target wasm32-unknown-unknown
+          # Part IV's worlds and the WFC panel run in the browser too.
+          cargo build -p overtone-walk --target wasm32-unknown-unknown
+          cargo build -p overtone-wfc --target wasm32-unknown-unknown
 
       - name: JS budget
         run: ./scripts/check_js_budget.sh
@@ -76,6 +79,18 @@ jobs:
         run: |
           cargo run --release -q -p overtone-cli -- predict --qubits 4 --layers 2 \
             | grep -q 'No trainability claim follows'
+
+      # Part IV 3: the transport exponent is what makes a world an experiment rather than a
+      # skin, so CI asserts the numbers the README prints.
+      - name: Transport exponents match the published regimes
+        run: |
+          cargo run --release -q -p overtone-walk --example transport | tee /tmp/tr.txt
+          grep -qE 'periodic +1\.000 +1\.000' /tmp/tr.txt
+          grep -qE 'classical +0\.500 +1\.000' /tmp/tr.txt
+          # Rudin-Shapiro saturates: the fit is rejected on its R^2, not read as an exponent.
+          grep -qE 'Rudin-Shapiro +-?0\.0[0-9]+ +0\.1' /tmp/tr.txt
+          # Conditioning the coin on the local letter pays only on the periodic word.
+          grep -qE 'two-periodic +0\.0197 +0\.0000 +0\.13' /tmp/tr.txt
 
   browser:
     name: browser
@@ -117,6 +132,8 @@ jobs:
           grep -qE '<b id="hero-lambda">[0-9]' dom.html || { echo "hero did not run"; exit 1; }
           grep -qE '<b id="cl-dim">28</b>' dom.html || { echo "closure did not run"; exit 1; }
           grep -qE '<b id="cl-var">0\.1071</b>' dom.html || { echo "prediction not rendered"; exit 1; }
+          grep -qE '<b id="mn-beta">0\.827</b>' dom.html || { echo "transport exponent not measured"; exit 1; }
+          grep -qE '<b id="mn-regime">superdiffusive</b>' dom.html || { echo "regime not named"; exit 1; }
           echo "page booted and populated from the engine"
 
   oracle:

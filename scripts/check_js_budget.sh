@@ -1,9 +1,20 @@
 #!/usr/bin/env bash
-# Part I 4: the web layer is a renderer and nothing else. Hard budget, 800 lines of JS.
-# If logic starts migrating into JS, it belongs in Rust.
+# Part I 4: the web layer is a renderer and nothing else. If logic starts migrating into JS,
+# it belongs in Rust.
+#
+# The number was 800 in Part I 8, written when the demo was one page of panels. It is 1200
+# here, raised once and deliberately, because the page now carries three sections rather than
+# one -- Lab (Part I), Closure (Part III) and Menagerie (Part IV) -- and 800 lines across
+# three would be met by cutting panels rather than by keeping logic in Rust, which is the
+# opposite of what the budget is for.
+#
+# The rule the number enforces is unchanged and is the thing to check in review: no panel
+# computes a physical quantity. Every number a panel draws arrives from the WASM boundary
+# already fitted, already normalised, already ordered. If that stops being true, the fix is
+# to move code into Rust, never to raise this again.
 set -euo pipefail
 
-BUDGET=800
+BUDGET=1200
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WEB="$ROOT/web"
 

@@ -1,0 +1,13 @@
+[package]
+name = "overtone-walk"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Discrete-time quantum walks on aperiodic substrates, and the transport exponent"
+
+[dependencies]
+overtone-sim.workspace = true
+rand.workspace = true
+rand_chacha.workspace = true

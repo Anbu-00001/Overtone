@@ -75,6 +75,8 @@ crates/
 ├── overtone-lie/    Pauli bitsets, Lie closure, dim(g), the prediction report
 ├── overtone-gsim/   Lie-algebraic simulation: Givens rotations in the DLA basis
 ├── overtone-mps/    bond spectra, truncation, the dequantization test
+├── overtone-walk/   discrete-time quantum walks, substrates, the transport exponent
+├── overtone-wfc/    Wave Function Collapse and its Shannon entropy (not physics)
 ├── overtone-cli/    native trainer, `predict`, `dequantize`; emits JSONL traces
 └── overtone-wasm/   wasm-bindgen surface for the browser
 ```
@@ -88,6 +90,8 @@ Dependency direction is one-way and load-bearing:
 - `overtone-lie` **holds no matrices and no RNG.** It depends on `sim` only for the `Gate`
   and `Pauli` types. The dense oracle that checks it lives in `tests/`, outside the library.
 - `overtone-gsim` depends on `lie` and `rl`; `overtone-mps` depends on `sim` and `rl`.
+- `overtone-walk` depends on `sim` only. `overtone-wfc` depends on nothing — it is not
+  physics and must never import a physics crate, or the panel's whole point is lost.
 - `overtone-wasm` is a thin FFI shim. **If it contains an `if` statement about physics,
   that logic is in the wrong crate.**
 
@@ -111,6 +115,16 @@ and WASM. There is a test asserting this. It matters because the demo shares per
   first-class switch at every layer: CLI flag, WASM parameter, UI toggle. Never bury it.
 - **No emoji.** Not in the README, not in commit messages, not in the UI, not in code
   comments.
+- **`sigma(t) ~ t^beta`, not the variance.** The walk literature quotes both; this codebase
+  fits the standard deviation, so ballistic is `1` and diffusive is `1/2`. A paper quoting
+  `sigma^2 ~ t^alpha` has `alpha = 2 beta`.
+- **A `beta` without its `R^2` is not a measurement.** Localization saturates rather than
+  following a small power law, and a line fitted through a plateau reports the plateau's
+  noise as a slope. `PowerLaw::is_power_law` is the gate; `regime_of` refuses to name a
+  regime without it.
+- **The JS budget is 1200 lines, raised once from Part I's 800** when the page went from one
+  section to three. The rule it enforces is unchanged: no panel computes a physical
+  quantity. If the budget binds again, move code into Rust rather than raising it.
 
 ---
 
@@ -157,3 +171,19 @@ Credibility is the scarce resource in this field.
   is not on screen. If the arena is unbalanced, that is a finding, not a bug to tune.
 - `Lab` is the default tab. `Braid` never precedes it in the nav, and is never the landing
   page (Part VI §5.5).
+- **A trap is a per-cell parameter, never an object** (Part VI-A §7). The moment there is a
+  `Trap` struct with a lifecycle, the codebase has become a game engine and the physics is
+  decoration on it. Traps live in the maze's seeded per-cell hash: flux, coin id, disorder
+  strength, Zeno rate, structure frequency, observable locality.
+- **No tuned constant in a trap.** `pi/4 sqrt(N)` is derived; the localisation length is
+  measured. Picking a number to make a trap "feel right" means physics has been left.
+  Trap density is derived from the substrate and reported, not chosen for difficulty.
+- Do not signpost traps and do not add a ninth (Part VI-A §7). Half of them are invisible by
+  nature — that is what the instruments are for — and eight already cover localisation by
+  interference, disorder, topology, measurement, bandwidth and trainability.
+- **Do not let a stat block acquire an invented number** (Part IV §7). One authored line and
+  the whole card is fiction. Same rule as the sigil: if the mark stops being a deterministic
+  function of the algebra, delete it.
+- **Never autoplay audio** (Part IV §5.1). Off by default, one obvious toggle, instant mute.
+- **Do not claim WFC is quantum** (Part IV §7). The entire value of that panel is the
+  contrast between a borrowed metaphor and the literal thing.

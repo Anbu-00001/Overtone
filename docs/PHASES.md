@@ -1,6 +1,7 @@
 # OVERTONE — phase plan
 
-The specs define milestones M0–M33 across six documents. This file groups them into nine
+The specs define milestones M0–M33 across seven documents (six parts plus the Part VI-A
+traps addendum). This file groups them into nine
 executable phases with explicit entry and exit criteria. A phase is done when its exit
 criteria are green in CI, not when its code is written.
 
@@ -172,7 +173,13 @@ rather than met.
 
 ---
 
-## Phase 5 — The lattice  *(M6–M9, M28)*
+## Phase 5 — The lattice  *(M6–M9, M28)*  — PARTIAL
+
+**The one-dimensional core of M6 and M7 landed early, in Phase 7**, because Part IV's worlds
+cannot be measured without a walk. `overtone-walk` has the strict light cone, the sparse
+representation, position-dependent coins, trajectory-based decoherence, the fitted spreading
+exponent, and the Hadamard/Grover/classical baselines. What is still outstanding is
+everything two-dimensional and everything about mazes.
 
 **Spec:** Part II.
 
@@ -293,20 +300,88 @@ Part III §12 puts the closure animation in the minimum-viable core while Part I
 
 ---
 
-## Phase 7 — Menagerie  *(M16–M21)*
+## Phase 7 — Menagerie  *(M16, M17, M18, M20, and the 1D core of M6/M7)*  — DONE
 
 **Spec:** Part IV.
 
 Substitution-rule worlds with a live transport-exponent readout, sonification, DLA-derived
-sigils and stat blocks, the four-agent race, MAP-Elites archive, the WFC entropy panel.
+sigils, the four-agent race, and the WFC entropy panel.
 
-Highest value per line: **sonification** (§5.1) — the project is called Overtone and the
-policy is a Fourier series; hearing `λ` beat into resonance lands before the bar chart does.
-Off by default, never autoplay.
+**Phase 5 was not a prerequisite and it was not skipped so much as partially pulled
+forward.** Part IV's M16 has no meaning without a walk to measure — a world with no
+measurable transport exponent is a skin — so the one-dimensional core of Part II's M6 and M7
+was built here: `overtone-walk`, with the strict light cone, position-dependent coins,
+trajectory decoherence and the fitted exponent. What remains Phase 5's is everything
+two-dimensional: mazes, the dark corridor, glued trees, Szegedy hitting time, M28's
+two-particle statistics, and M9's learned coin.
 
-**Exit criteria**
-- Measured `β` matches published regimes; Fibonacci vs Rudin–Shapiro visibly different.
-- Every stat-block line is measured, never authored.
+**Exit criteria — all met**
+- Measured exponents match the published regimes. Clean lattice `1.000` with `R^2 = 1.000`
+  against Part II M6's `1.00 +- 0.03`; the classical baseline is `0.500` exactly, as a
+  closed form rather than a simulation.
+- Fibonacci and Rudin-Shapiro are visibly different: `beta = 0.82` against a trace that
+  saturates at `sigma = 26` where the clean lattice reaches `325`.
+- Every stat-block line is measured. The sigil is a deterministic function of the algebra,
+  tested by reaching the same algebra through a reversed generating set and requiring the
+  identical mark.
+- The three aperiodic words match Lo Gullo et al. Fig. 1 character for character.
+- WFC terminates with a seam-consistent grid on every seed, its entropy falls monotonically
+  to zero, and the same seed gives the same maze.
+
+**Corrections carried forward from the build**
+- **Part IV 3's spectral labels are swapped.** It calls Fibonacci singular-continuous and
+  Rudin-Shapiro discrete. Fibonacci has a *pure point* spectrum, Thue-Morse is the singular
+  continuous one, and Rudin-Shapiro is *absolutely continuous* — which is exactly why it
+  behaves like disorder. The behaviours in that table are roughly right; the labels are not,
+  and the panel's caption depends on them.
+- **A `beta` without its `R^2` is not a measurement.** Anderson localization does not produce
+  a small exponent, it produces a `sigma` that saturates, and a line fitted through a plateau
+  reports the plateau's noise as a slope. The first disorder run reported `beta = 0.44` with
+  `R^2 = 0.20`; the honest statement is that `sigma` saturates at three sites.
+- **A single disorder realisation is not a measurement either.** With a two-letter word the
+  fitted exponent swung from `0.15` to `0.34` between seeds. Anderson localization is a
+  statement about a continuum of local parameters, so the disorder world now draws a
+  continuous coin angle per site.
+- **A constant coin cannot see the world, and that is the point.** The substrate selects
+  between two coins, so an agent playing the same coin at both letters produces a
+  bit-identical trace on the Fibonacci world and on the clean lattice. The first race
+  reported exactly that and it read as a bug. Part II 2 says the policy is the coin; an agent
+  whose coin ignores the local feature has no policy.
+- **Spread is the wrong objective for the race.** `sigma` is maximised by the coin that does
+  not mix at all — two ballistic beams sitting on the light cone — and that coin is optimal
+  on every substrate, so optimising it teaches an agent nothing about the world. The
+  objective is now arrival near a distant target, which is what a hitting time measures.
+- **The optimiser needed a multi-start and an explicit search of the blind solution.** With a
+  single start it reported that conditioning on the letter helps on the Fibonacci world; with
+  the diagonal searched properly the answer reverses. The honest result is a negative one:
+  **conditioning the coin on the local letter pays only on the periodic word.** On every
+  aperiodic word the best strategy found is to ignore the substrate.
+- **The Grover coin is degenerate in one dimension.** `2|s><s| - I` on a two-dimensional coin
+  space is exactly the Pauli `X`, so the field oscillates between two sites and `sigma` stays
+  at zero. Part II 7 makes it a mandatory baseline; reporting that it is degenerate is the
+  honest form of that baseline.
+- **Full decoherence is exactly a simple random walk, not approximately.** After a position
+  measurement the field is on one site, so each neighbour receives exactly one coin
+  component and the next measurement always leaves a basis state, which the Hadamard coin
+  splits exactly in half. Measured total variation from the binomial is `0.0025` at 200000
+  trajectories and falls as `1/sqrt(N)` — sampling error, not residual coherence.
+- **The JS budget was raised from 800 to 1200, once and deliberately**, because the page now
+  carries three sections rather than one. The rule it enforces — no panel computes a physical
+  quantity — is unchanged, and if it binds again the fix is to move code into Rust.
+- The race optimiser costs about a thousand walks, and calling it from the resize handler
+  starved the hero on the Lab panel for seconds. It is computed once per world and cached.
+
+**Deferred, with reasons**
+- **M19, the MAP-Elites archive.** Part IV 4 ties it to the nightly Actions job that pushes
+  to the Atlas, which is Tier 1 infrastructure that does not exist yet. The descriptors it
+  needs — `dim(g)`, `beta`, effective `chi` — are all built and measured, so this is a
+  scheduling decision, not a missing capability.
+- **M21, the hyperbolic tiling and the Hat monotile.** Part IV 6 puts them last itself, as
+  the hardest to render and the least load-bearing.
+- **Sonification is built but unheard here.** `web/js/sound.js` plays the environment's
+  frequency against `lambda` so the beat falls to zero as the policy locks on. It is wired,
+  off by default, and never autoplays — but a headless browser cannot verify a beat, so it
+  is untested rather than verified.
 
 ---
 
@@ -353,7 +428,69 @@ an exact physical counterpart:
   accumulates beside the maze in generators `σ₁ σ₂⁻¹ …`.
 
 **Milestones:** M29 pursuer · M30 player control (`evolve`, `measure`, `phase`, `absorb`) ·
-M31 absorption and live closure · M32 braiding · M33 the harness.
+M31 absorption and live closure · M32 braiding and traps · M33 the harness.
+
+### M32's traps (Part VI-A)
+
+Part VI-A folds six sub-milestones into M32. They are the answer to the one thing Part VI
+lacks — terrain that matters — and they obey the same rule as everything else in the arena:
+every trap is a published localization or topology result, and none of them carries a tuned
+constant.
+
+The structural claim is what makes this cheap: **a trap is not an object, it is a per-cell
+parameter.** Local flux, local coin, local disorder strength, local observable locality, all
+drawn from the same seeded hash the maze already uses. No entity system, no spawn logic, no
+collision detection — which is also the guarantee that it stays physics.
+
+| Trap | Catches | Escape | Rests on |
+|---|---|---|---|
+| T1 Grover well | anyone in range | outlast the over-rotation | `pi/4 sqrt(N)`, Boyer et al. 1998 |
+| T2 Aharonov–Bohm cage | the wrong coin | re-parameterise, or inject disorder | Vidal et al. PRL 81, 5888; arXiv:1910.00845 |
+| T3 Topological bound state | anyone crossing | change the bulk topology | Kitagawa et al. PRA 82, 033429 |
+| T4 Chiral corridor | anyone entering | forward only | same |
+| T5 Disorder patch | **coherent** agents | decohere yourself | Anderson localization, Phase 5 |
+| T6 Zeno region | anyone evolving | leave spatially | Misra & Sudarshan 1977 |
+| T7 Spectral trap | low-`L` agents | raise `L`, or tune `lambda` | Part I §7.1, Phase 2 |
+| T8 Plateau region | **learning** agents | freeze the coin | Cerezo et al. Nat. Commun. 12, 1791 |
+
+The composition principle is the reason this is a system rather than a list: **every escape
+is a vulnerability to a different trap**, and every one of those trades is a theorem the
+earlier phases already implemented and instrumented. Decohere past T5 and the decoherence
+front catches you. Widen `dim(g)` past T7 and `Var[∂C] ∝ 1/dim(g)` walks you into T8. Freeze
+the coin to survive T8 and you can no longer re-parameterise out of T2.
+
+**Build order** — the first two carry the system:
+
+- **M32a — T5, T6.** Disorder patches and Zeno regions; reuses Phase 5 entirely. Acceptance:
+  `σ(t)` saturates inside a patch for a coherent walker and does not for a decohered one.
+- **M32b — T7 with band-limited rendering.** Acceptance: an `L < k` agent's return on trap
+  structure is zero to `1e-3`, and its rendered view provably lacks frequency-`k` content.
+  **This is the best idea in the addendum**: draw the maze as the agent can represent it, so
+  two agents with different `L` are visibly walking through different mazes. It turns Part
+  I's central abstraction into something you can look at, and it reuses the Phase 3 spectral
+  instrument rather than adding an engine.
+- **M32c — T2, Aharonov–Bohm cages.** Acceptance: complete confinement, zero amplitude
+  outside the cage to `1e-12`, and release on changing the coin. Part VI-A §7 is explicit
+  that this test must not be skipped: AB caging is exact, and a cage that "mostly" confines
+  is a slow region with a grand name.
+- **M32d — T1, Grover wells.** Acceptance: peak capture at `pi/4 sqrt(N)` steps and
+  measurable release on over-rotation, both against the closed form.
+- **M32e — T3, T4, topological.** Acceptance: the bound state survives perturbation while a
+  non-topological trap of similar depth does not.
+- **M32f — T8, plateau regions.** Acceptance: the Phase 3 gradient-variance instrument
+  registers the collapse; a frozen-coin agent passes through unaffected.
+
+**Dependencies this adds.** M32a needs Phase 5's decoherence; M32b needs Phases 1–3; M32c
+and M32e need Phase 5's lattice and coins; M32f needs Phase 3's instrument and Phase 6's
+`dim(g)`. Trap *density* is derived from Phase 7's substrate — the Rudin–Shapiro world is
+already strongly confining and needs few, the periodic world is nearly frictionless and can
+carry more — and is reported as a measured statistic rather than chosen.
+
+**Extra traps carried into `CLAUDE.md`:** no tuned constant anywhere (`pi/4 sqrt(N)` is
+derived, the localisation length is measured); no `Trap` object with a lifecycle; no
+signposting, because half of them are invisible by nature and the player's own instruments
+are the warning; and no ninth trap, because eight already cover localisation by
+interference, disorder, topology, measurement, bandwidth and trainability.
 
 **Exit criteria**
 - Capture is detected as the `β` transition, with no separate capture condition in the code.

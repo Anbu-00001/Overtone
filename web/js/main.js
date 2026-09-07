@@ -4,9 +4,11 @@
 // (Part IV 5.4). Frames are never interpolated -- a discrete-time process that glides is a
 // lie about the process.
 
-import init, { Closure, Lab, Landing, Plateau, version } from '../pkg/overtone_wasm.js';
+import init, { Closure, Lab, Landing, Menagerie, Plateau, Wfc, version } from '../pkg/overtone_wasm.js';
 import * as panel from './panels.js';
+import * as men from './menagerie.js';
 import { landing, lattice } from './closure.js';
+import * as sound from './sound.js';
 
 const $ = (id) => document.getElementById(id);
 const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -18,6 +20,11 @@ let running = false;
 let lastStep = 0;
 let clo = null;
 let land = null;
+let world = null;
+let wfc = null;
+let tiles = null;
+let lastCollapse = 0;
+let raceData = null;
 
 function config() {
   return {
@@ -138,6 +145,9 @@ function heroFrame(t) {
   panel.ret($('c-hero-return'), hero.lab);
   $('hero-lambda').textContent = hero.lab.lambda().toFixed(3);
   $('hero-return').textContent = hero.lab.exact_return().toFixed(4);
+  // Part IV 5.1: the environment's frequency and the policy's scaling, as two tones. The
+  // beat rate is their difference, so it falls to zero exactly as lambda locks on.
+  sound.update(3, hero.lab.lambda());
 }
 
 function startHero() {
@@ -167,6 +177,39 @@ async function runSweep() {
   panel.plateau($('c-plateau'), sweepData);
 }
 
+// The Menagerie. Rebuilding is a few hundred walk steps, which is cheap enough to do on
+// every control change rather than behind a button.
+function buildWorld() {
+  if (world) world.free();
+  const steps = +$('mn-steps').value;
+  const theta = (+$('mn-theta').value * Math.PI) / 180;
+  world = new Menagerie(+$('mn-world').value, steps, theta, +$('mn-seed').value);
+  $('mn-steps-value').textContent = steps;
+  $('mn-theta-value').textContent = $('mn-theta').value;
+  $('mn-beta').textContent = world.is_power_law() ? world.beta().toFixed(3) : 'none';
+  $('mn-regime').textContent = world.regime();
+  $('mn-published').textContent = world.world_regime();
+  raceData = null;
+  drawWorld();
+  // The coin search is the expensive call on this page; let the frame paint before it.
+  setTimeout(() => { raceData = Array.from(world.race()); drawWorld(); }, 16);
+}
+
+function drawWorld() {
+  if (!world) return;
+  men.transport($('c-transport'), world);
+  men.field($('c-field'), world);
+  if (raceData) men.race($('c-race'), raceData);
+  if (clo) men.sigil($('c-sigil'), clo.g);
+  if (wfc) men.wfc($('c-wfc'), wfc, tiles);
+}
+
+function buildWfc() {
+  if (wfc) wfc.free();
+  wfc = new Wfc(20, 13, +$('mn-seed').value);
+  if (!tiles) tiles = Array.from(Wfc.tileset());
+}
+
 function wire() {
   ['qubits', 'layers', 'k', 'policy', 'lambda', 'entangle', 'seed'].forEach((id) =>
     $(id).addEventListener('input', build));
@@ -184,16 +227,27 @@ function wire() {
   ['cl-family', 'cl-qubits'].forEach((id) => $(id).addEventListener('input', () => {
     buildClosure();
     if (land) land.shown = 0;
+    // The sigil is a picture of this algebra, so it changes when the algebra does.
+    if (clo) men.sigil($('c-sigil'), clo.g);
   }));
   $('cl-replay').addEventListener('click', () => {
     clo.shown = 0;
     if (land) land.shown = 0;
   });
   $('p-max').addEventListener('input', () => { $('p-max-value').textContent = $('p-max').value; });
+  ['mn-world', 'mn-steps', 'mn-theta', 'mn-seed'].forEach((id) =>
+    $(id).addEventListener('input', buildWorld));
+  $('mn-wfc').addEventListener('click', () => { buildWfc(); drawWorld(); });
+  $('mn-sound').addEventListener('change', (e) => {
+    // Created only on a human gesture, which is both the rule and what browsers require.
+    const on = e.target.checked ? sound.toggle() : (sound.stop(), false);
+    e.target.checked = on;
+  });
   window.addEventListener('resize', () => {
     draw();
     if (sweepData) panel.plateau($('c-plateau'), sweepData);
     if (land) landing($('c-landing'), land, land.shown);
+    drawWorld();
   });
 }
 
@@ -210,6 +264,8 @@ init().then(() => {
   }
   panel.plateau($('c-plateau'), null);
   buildClosure();
+  buildWfc();
+  buildWorld();
   requestAnimationFrame(loop);
   // The measurement is a few hundred random circuits per width; let the page paint first.
   setTimeout(buildLanding, 32);

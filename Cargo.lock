@@ -245,6 +245,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "overtone-walk"
+version = "0.1.0"
+dependencies = [
+ "overtone-sim",
+ "rand",
+ "rand_chacha",
+]
+
+[[package]]
 name = "overtone-wasm"
 version = "0.1.0"
 dependencies = [
@@ -253,9 +262,19 @@ dependencies = [
  "overtone-rl",
  "overtone-sim",
  "overtone-spec",
+ "overtone-walk",
+ "overtone-wfc",
  "rand",
  "rand_chacha",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "overtone-wfc"
+version = "0.1.0"
+dependencies = [
+ "rand",
+ "rand_chacha",
 ]
 
 [[package]]
