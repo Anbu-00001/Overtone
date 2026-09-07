@@ -1,0 +1,12 @@
+[package]
+name = "overtone-mps"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Matrix product states and the dequantization test"
+
+[dependencies]
+overtone-sim.workspace = true
+overtone-rl.workspace = true

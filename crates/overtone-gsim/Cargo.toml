@@ -1,0 +1,15 @@
+[package]
+name = "overtone-gsim"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Lie-algebraic simulation: Givens rotations in the DLA basis, and gradients"
+
+[dependencies]
+overtone-sim.workspace = true
+overtone-rl.workspace = true
+overtone-lie.workspace = true
+rand.workspace = true
+rand_chacha.workspace = true

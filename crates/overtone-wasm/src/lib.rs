@@ -476,3 +476,271 @@ impl Plateau {
 pub fn version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
+
+// ---------------------------------------------------------------------------------------
+// Part III: the Closure tab.
+// ---------------------------------------------------------------------------------------
+
+/// C1: the closure, animated.
+///
+/// Everything the panel needs is precomputed here in one pass -- the strings as glyph
+/// codes, the edge each new string arrived on, and the growth curve whose plateau *is* the
+/// closure. JavaScript replays that history frame by frame; it never takes a commutator.
+#[wasm_bindgen]
+pub struct Closure {
+    observable: String,
+    algebra: overtone_lie::Algebra,
+    prediction: overtone_lie::Prediction,
+    num_qubits: usize,
+    generators: usize,
+}
+
+#[wasm_bindgen]
+impl Closure {
+    /// `family`: 0 Part I ansatz with fixed entanglers, 1 the same with entanglers made
+    /// trainable, 2 transverse-field Ising, 3 Heisenberg, 4 XY, 5 hardware-efficient.
+    #[wasm_bindgen(constructor)]
+    pub fn new(family: u32, num_qubits: usize, layers: usize, limit: usize) -> Closure {
+        use overtone_lie::family::{self, EntanglerPolicy};
+
+        let mut fixed = 0usize;
+        let generators = match family {
+            0 | 1 => {
+                let policy = if family == 0 {
+                    EntanglerPolicy::Strict
+                } else {
+                    EntanglerPolicy::Parameterised
+                };
+                let ansatz =
+                    SpectralControlAnsatz::build(num_qubits, layers.max(1), Scaling::Pinned, true);
+                let extracted = family::from_circuit(&ansatz.build(&[0.3]), policy);
+                fixed = extracted.fixed_entanglers;
+                extracted.generators
+            }
+            2 => family::tfim(num_qubits),
+            3 => family::heisenberg(num_qubits),
+            4 => family::xy(num_qubits),
+            _ => family::hardware_efficient(num_qubits),
+        };
+        let algebra = overtone_lie::closure(&generators, num_qubits, limit.max(4));
+        let observable = overtone_lie::predict::pick_observable(
+            &algebra,
+            &overtone_lie::PauliString::single(0, overtone_sim::Pauli::Z),
+        );
+        let mut prediction = overtone_lie::Prediction::new(&algebra, &observable);
+        prediction.note_fixed_entanglers(fixed);
+        Closure {
+            observable: observable.render(num_qubits),
+            algebra,
+            prediction,
+            num_qubits,
+            generators: generators.len(),
+        }
+    }
+
+    pub fn dim(&self) -> usize {
+        self.algebra.dim()
+    }
+
+    pub fn num_generators(&self) -> usize {
+        self.generators
+    }
+
+    pub fn truncated(&self) -> bool {
+        self.algebra.truncated()
+    }
+
+    pub fn dim_su(&self) -> f64 {
+        self.prediction.dim_su
+    }
+
+    /// `|S|` after each round: the growth curve of the C1 inset.
+    pub fn growth(&self) -> Vec<f64> {
+        self.algebra.growth().iter().map(|&v| v as f64).collect()
+    }
+
+    /// Glyph codes, `num_qubits` per string, `0..=3` for `I X Y Z`.
+    pub fn glyphs(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(self.algebra.dim() * self.num_qubits);
+        for p in self.algebra.basis() {
+            for q in 0..self.num_qubits {
+                out.push(match p.at(q) {
+                    overtone_sim::Pauli::I => 0,
+                    overtone_sim::Pauli::X => 1,
+                    overtone_sim::Pauli::Y => 2,
+                    overtone_sim::Pauli::Z => 3,
+                });
+            }
+        }
+        out
+    }
+
+    /// Two parent indices per string; a generator points at itself.
+    pub fn parents(&self) -> Vec<f64> {
+        let mut out = Vec::with_capacity(self.algebra.dim() * 2);
+        for &(a, b) in self.algebra.parents() {
+            out.push(a as f64);
+            out.push(b as f64);
+        }
+        out
+    }
+
+    /// Theorem 1's variance of the loss, or `NaN` where the theorem does not apply.
+    pub fn predicted_variance(&self) -> f64 {
+        self.prediction.loss_variance.unwrap_or(f64::NAN)
+    }
+
+    pub fn leaves_the_group(&self) -> bool {
+        self.prediction.leaves_the_group
+    }
+
+    pub fn verdict(&self) -> String {
+        self.prediction.verdict()
+    }
+
+    /// Which observable the variance refers to. Not always `Z_0`; see `pick_observable`.
+    pub fn observable(&self) -> String {
+        self.observable.clone()
+    }
+
+    pub fn caveats(&self) -> String {
+        self.prediction.caveats.join(" ")
+    }
+}
+
+/// C2: the prediction landing.
+///
+/// The algebraic prediction is computed for every width first, then the measurement is run.
+/// Part III 13: the ordering is the argument, so the two arrays are returned separately and
+/// the panel is expected to draw the line before the points.
+#[wasm_bindgen]
+pub struct Landing {
+    widths: Vec<f64>,
+    predicted: Vec<f64>,
+    measured: Vec<f64>,
+    dims: Vec<f64>,
+}
+
+#[wasm_bindgen]
+impl Landing {
+    /// Sweep `n` from `min_qubits` to `max_qubits` for the transverse-field Ising family
+    /// (`family = 0`, polynomial) or the Heisenberg chain (`family = 1`, exponential).
+    #[wasm_bindgen(constructor)]
+    pub fn new(
+        family: u32,
+        min_qubits: usize,
+        max_qubits: usize,
+        depth: usize,
+        samples: usize,
+        seed: u32,
+    ) -> Landing {
+        use overtone_gsim::GsimCircuit;
+        use overtone_lie::{closure_unbounded, family as fam, predict::components, PauliString};
+        use rand::{Rng, SeedableRng};
+
+        let mut widths = Vec::new();
+        let mut predicted = Vec::new();
+        let mut measured = Vec::new();
+        let mut dims = Vec::new();
+
+        for n in min_qubits..=max_qubits {
+            let (generating, gates, obs) = if family == 0 {
+                let mut g: Vec<PauliString> = (0..n)
+                    .map(|q| PauliString::single(q, overtone_sim::Pauli::X))
+                    .collect();
+                g.extend((0..n - 1).map(|q| {
+                    PauliString::from_factors(&[
+                        (q, overtone_sim::Pauli::Z),
+                        (q + 1, overtone_sim::Pauli::Z),
+                    ])
+                }));
+                (
+                    fam::tfim(n),
+                    g,
+                    PauliString::single(0, overtone_sim::Pauli::X),
+                )
+            } else {
+                let g = fam::heisenberg(n);
+                (
+                    g.clone(),
+                    g,
+                    PauliString::from_factors(&[
+                        (0, overtone_sim::Pauli::X),
+                        (1, overtone_sim::Pauli::X),
+                    ]),
+                )
+            };
+            let algebra = closure_unbounded(&generating, n);
+            let oi = match algebra.index_of(&obs) {
+                Some(i) => i,
+                None => continue,
+            };
+            let comps = components(&algebra);
+            let comp = match comps.iter().find(|c| c.contains(&oi)) {
+                Some(c) => c,
+                None => continue,
+            };
+            let z_type = comp.iter().filter(|&&i| algebra.basis()[i].x == 0).count();
+            let dim = algebra.dim();
+
+            let mut weights = vec![0.0; dim];
+            weights[oi] = 1.0;
+            let mut circuit = GsimCircuit::new(algebra, gates.clone());
+            for _ in 0..depth {
+                for gi in 0..gates.len() {
+                    circuit.push_raw(gi);
+                }
+            }
+            let ngates = circuit.gates().len();
+            let mut r = ChaCha8Rng::seed_from_u64(seed as u64 + n as u64);
+            let (mut sum, mut sum_sq) = (0.0, 0.0);
+            for _ in 0..samples {
+                let angles: Vec<f64> = (0..ngates)
+                    .map(|_| r.gen_range(-std::f64::consts::PI..std::f64::consts::PI))
+                    .collect();
+                let e = circuit.evolve_angles(&angles);
+                let v: f64 = weights.iter().zip(&e).map(|(w, x)| w * x).sum();
+                sum += v;
+                sum_sq += v * v;
+            }
+            let mean = sum / samples as f64;
+            widths.push(n as f64);
+            dims.push(dim as f64);
+            predicted.push(z_type as f64 / comp.len() as f64);
+            measured.push(sum_sq / samples as f64 - mean * mean);
+        }
+        Landing {
+            widths,
+            predicted,
+            measured,
+            dims,
+        }
+    }
+
+    pub fn widths(&self) -> Vec<f64> {
+        self.widths.clone()
+    }
+
+    /// Computed from the algebra alone, before anything is run.
+    pub fn predicted(&self) -> Vec<f64> {
+        self.predicted.clone()
+    }
+
+    /// Measured afterwards, from random circuits.
+    pub fn measured(&self) -> Vec<f64> {
+        self.measured.clone()
+    }
+
+    pub fn dims(&self) -> Vec<f64> {
+        self.dims.clone()
+    }
+
+    /// Worst relative disagreement over the sweep, for the readout.
+    pub fn worst_ratio(&self) -> f64 {
+        self.predicted
+            .iter()
+            .zip(&self.measured)
+            .map(|(p, m)| (m / p - 1.0).abs())
+            .fold(0.0, f64::max)
+    }
+}

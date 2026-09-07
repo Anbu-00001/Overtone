@@ -181,9 +181,38 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 name = "overtone-cli"
 version = "0.1.0"
 dependencies = [
+ "overtone-gsim",
+ "overtone-lie",
+ "overtone-mps",
  "overtone-rl",
  "overtone-sim",
  "overtone-spec",
+]
+
+[[package]]
+name = "overtone-gsim"
+version = "0.1.0"
+dependencies = [
+ "overtone-lie",
+ "overtone-rl",
+ "overtone-sim",
+ "rand",
+ "rand_chacha",
+]
+
+[[package]]
+name = "overtone-lie"
+version = "0.1.0"
+dependencies = [
+ "overtone-sim",
+]
+
+[[package]]
+name = "overtone-mps"
+version = "0.1.0"
+dependencies = [
+ "overtone-rl",
+ "overtone-sim",
 ]
 
 [[package]]
@@ -219,9 +248,12 @@ dependencies = [
 name = "overtone-wasm"
 version = "0.1.0"
 dependencies = [
+ "overtone-gsim",
+ "overtone-lie",
  "overtone-rl",
  "overtone-sim",
  "overtone-spec",
+ "rand",
  "rand_chacha",
  "wasm-bindgen",
 ]

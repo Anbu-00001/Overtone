@@ -4,8 +4,9 @@
 // (Part IV 5.4). Frames are never interpolated -- a discrete-time process that glides is a
 // lie about the process.
 
-import init, { Lab, Plateau, version } from '../pkg/overtone_wasm.js';
+import init, { Closure, Lab, Landing, Plateau, version } from '../pkg/overtone_wasm.js';
 import * as panel from './panels.js';
+import { landing, lattice } from './closure.js';
 
 const $ = (id) => document.getElementById(id);
 const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -15,6 +16,8 @@ let hero = null;
 let sweepData = null;
 let running = false;
 let lastStep = 0;
+let clo = null;
+let land = null;
 
 function config() {
   return {
@@ -60,6 +63,51 @@ function draw() {
   panel.gradcheck($('c-gradcheck'), lab);
 }
 
+// The Closure chapter. The closure is computed in one call and replayed frame by frame;
+// JavaScript never takes a commutator.
+function buildClosure() {
+  const n = +$('cl-qubits').value;
+  $('cl-qubits-value').textContent = n;
+  if (clo) clo.g.free();
+  const g = new Closure(+$('cl-family').value, n, 2, 4096);
+  clo = {
+    g, n, dim: g.dim(), shown: 0, last: 0,
+    glyphs: g.glyphs(), parents: Array.from(g.parents()),
+    growth: Array.from(g.growth()), generators: g.num_generators(),
+  };
+  $('cl-dim').textContent = g.dim() + (g.truncated() ? '+ (abandoned)' : '');
+  $('cl-su').textContent = g.dim_su().toFixed(0);
+  const v = g.predicted_variance();
+  $('cl-var').textContent = Number.isNaN(v) ? 'not applicable' : v.toFixed(4);
+  $('cl-obs').textContent = g.observable();
+  $('cl-verdict').textContent = g.verdict();
+}
+
+function closureFrame(t) {
+  if (!clo || t - clo.last < 24) return;
+  clo.last = t;
+  if (clo.shown >= clo.dim && land && land.shown >= land.measured.length) return;
+  clo.shown = Math.min(clo.dim, clo.shown + Math.max(1, Math.ceil(clo.dim / 90)));
+  lattice($('c-closure'), {
+    ...clo,
+    growth: clo.growth.filter((v, i) => i === 0 || v <= clo.shown),
+  });
+  if (land) {
+    if (clo.shown >= clo.dim) land.shown = Math.min(land.measured.length, land.shown + 1);
+    landing($('c-landing'), land, land.shown);
+  }
+}
+
+function buildLanding() {
+  const l = new Landing(0, 3, 7, 32, 400, 7);
+  land = {
+    widths: Array.from(l.widths()), predicted: Array.from(l.predicted()),
+    measured: Array.from(l.measured()), worst: l.worst_ratio(), shown: 0,
+  };
+  l.free();
+  landing($('c-landing'), land, 0);
+}
+
 function loop(t) {
   if (running && t - lastStep > 60) {
     lastStep = t;
@@ -68,6 +116,7 @@ function loop(t) {
     draw();
   }
   if (hero) heroFrame(t);
+  closureFrame(t);
   requestAnimationFrame(loop);
 }
 
@@ -132,10 +181,19 @@ function wire() {
     draw();
   });
   $('p-run').addEventListener('click', runSweep);
+  ['cl-family', 'cl-qubits'].forEach((id) => $(id).addEventListener('input', () => {
+    buildClosure();
+    if (land) land.shown = 0;
+  }));
+  $('cl-replay').addEventListener('click', () => {
+    clo.shown = 0;
+    if (land) land.shown = 0;
+  });
   $('p-max').addEventListener('input', () => { $('p-max-value').textContent = $('p-max').value; });
   window.addEventListener('resize', () => {
     draw();
     if (sweepData) panel.plateau($('c-plateau'), sweepData);
+    if (land) landing($('c-landing'), land, land.shown);
   });
 }
 
@@ -151,5 +209,8 @@ init().then(() => {
     hero.steps = 260;
   }
   panel.plateau($('c-plateau'), null);
+  buildClosure();
   requestAnimationFrame(loop);
+  // The measurement is a few hundred random circuits per width; let the page paint first.
+  setTimeout(buildLanding, 32);
 });

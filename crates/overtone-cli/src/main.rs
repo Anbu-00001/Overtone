@@ -20,6 +20,8 @@ USAGE:
     overtone ceiling [OPTIONS]
     overtone spectrum [OPTIONS]
     overtone plateau [OPTIONS]
+    overtone predict [OPTIONS]
+    overtone dequantize [OPTIONS]
 
 TRAIN OPTIONS:
     --k <N>            environment frequency for SpectralControl-k   [default: 3]
@@ -43,6 +45,20 @@ CEILING OPTIONS:
 SPECTRUM OPTIONS:
     accepts the TRAIN options; trains, then transforms pi(1|s) and reports the
     magnitude at each frequency together with what leaked above the ceiling
+
+PREDICT OPTIONS:
+    --qubits <N>       register size                                 [default: 4]
+    --layers <N>       re-uploading layers, L                        [default: 2]
+    --no-entangle      ablate the ring of CZ to identity
+    --entanglers <K>   fixed | parameterised: how to treat CZ layers [default: fixed]
+    --family <NAME>    ansatz | tfim | heisenberg | xy | kitaev | hea
+    --max-dim <N>      abandon the closure past this many elements   [default: 200000]
+
+DEQUANTIZE OPTIONS:
+    accepts the TRAIN options; trains, then compresses the policy state to each bond
+    dimension in turn and reports the smallest one that reproduces it
+    --tolerance <F>    policy agreement required                     [default: 1e-6]
+    --max-chi <N>      largest bond dimension to try                 [default: 16]
 
 PLATEAU OPTIONS:
     --min-qubits <N>   sweep start                                   [default: 2]
@@ -112,6 +128,8 @@ fn main() {
         Some("ceiling") => cmd_ceiling(&Args::parse(&argv[1..])),
         Some("spectrum") => cmd_spectrum(&Args::parse(&argv[1..])),
         Some("plateau") => cmd_plateau(&Args::parse(&argv[1..])),
+        Some("predict") => cmd_predict(&Args::parse(&argv[1..])),
+        Some("dequantize") => cmd_dequantize(&Args::parse(&argv[1..])),
         Some("--help") | Some("-h") | None => print!("{USAGE}"),
         Some(other) => fail(&format!("unknown command {other:?}\n\n{USAGE}")),
     }
@@ -366,4 +384,168 @@ fn cmd_plateau(args: &Args) {
     println!("#");
     println!("# Cerezo et al. 2021: a local observable escapes the plateau only while the");
     println!("# circuit stays shallow. Re-run with --depth linear:2 to watch it stop working.");
+}
+
+/// `overtone predict`: what the algebra says before a gradient step is taken.
+///
+/// Part III 1 wants this to be a tool, not a demo -- something a person with a real VQC
+/// runs on a Tuesday. The report is the prediction chain of Part III 2: `dim(g)`, the loss
+/// variance it implies, the rank it caps the Fisher matrix at, and the parameter count past
+/// which overparameterisation sets in.
+fn cmd_predict(args: &Args) {
+    use overtone_lie::family::{self, EntanglerPolicy};
+    use overtone_lie::{closure, PauliString, Prediction};
+
+    let qubits: usize = args.get("qubits", 4);
+    let layers: usize = args.get("layers", 2);
+    let max_dim: usize = args.get("max-dim", 200_000);
+    let entangle = !args.flag("no-entangle");
+    let policy = match args.text("entanglers", "fixed").as_str() {
+        "fixed" => EntanglerPolicy::Strict,
+        "parameterised" | "parameterized" => EntanglerPolicy::Parameterised,
+        other => fail(&format!(
+            "--entanglers must be fixed or parameterised, got {other:?}"
+        )),
+    };
+    let family_name = args.text("family", "ansatz");
+
+    let mut fixed_entanglers = 0usize;
+    let (generators, note) = match family_name.as_str() {
+        "ansatz" => {
+            let ansatz = SpectralControlAnsatz::build(qubits, layers, Scaling::Pinned, entangle);
+            let circuit = ansatz.build(&[0.3]);
+            let extracted = family::from_circuit(&circuit, policy);
+            fixed_entanglers = extracted.fixed_entanglers;
+            let note = format!(
+                "Part I ansatz, {} parameterised generators, {} fixed entanglers, \
+                 {} other fixed gates",
+                extracted.generators.len(),
+                extracted.fixed_entanglers,
+                extracted.fixed_local
+            );
+            (extracted.generators, note)
+        }
+        "tfim" => (family::tfim(qubits), "transverse-field Ising chain".into()),
+        "heisenberg" => (family::heisenberg(qubits), "Heisenberg chain".into()),
+        "xy" => (family::xy(qubits), "XY model".into()),
+        "kitaev" => (family::kitaev(qubits), "Kitaev chain".into()),
+        "hea" => (
+            family::hardware_efficient(qubits),
+            "hardware-efficient, entanglers parameterised".into(),
+        ),
+        other => fail(&format!("unknown --family {other:?}")),
+    };
+
+    let started = std::time::Instant::now();
+    let algebra = closure(&generators, qubits, max_dim);
+    let elapsed = started.elapsed();
+
+    // Z on qubit zero is what the Born rule reads in Part I 6.3 -- but it is not always in
+    // the algebra, and Theorem 1 needs it to be.
+    let preferred = PauliString::single(0, overtone_sim::Pauli::Z);
+    let observable = overtone_lie::predict::pick_observable(&algebra, &preferred);
+    let mut report = Prediction::new(&algebra, &observable);
+    report.note_fixed_entanglers(fixed_entanglers);
+
+    println!("# overtone predict");
+    println!("family              {family_name}  ({note})");
+    println!("qubits              {qubits}");
+    println!("generators          {}", generators.len());
+    println!(
+        "closure             {} rounds, {:.3} s",
+        algebra.growth().len(),
+        elapsed.as_secs_f64()
+    );
+    println!("growth |S|          {:?}", algebra.growth());
+    println!();
+    println!("dim(g)              {}", report.dim_g);
+    println!("dim su(2^n)         {:.0}", report.dim_su);
+    println!(
+        "blocks              {:?} (centre {})",
+        report.ideals, report.centre
+    );
+    println!("scaling             {:?}", report.scaling);
+    println!("observable          {}", observable.render(qubits));
+    match report.loss_variance {
+        Some(v) => println!("Var[loss]           {v:.6}   (Ragone et al. 2024, Theorem 1)"),
+        None => println!("Var[loss]           not applicable"),
+    }
+    println!("rank(QFIM) <=       {}", report.qfim_rank_bound);
+    println!("overparam. at M ~   {}", report.overparameterisation_bound);
+    println!();
+    for c in &report.caveats {
+        println!("caveat: {c}");
+    }
+    println!("verdict: {}", report.verdict());
+}
+
+/// `overtone dequantize`: the smallest tensor network that is this agent.
+fn cmd_dequantize(args: &Args) {
+    let k: usize = args.get("k", 3);
+    let qubits: usize = args.get("qubits", 4);
+    let layers: usize = args.get("layers", 3);
+    let seed: u64 = args.get("seed", 7);
+    let tolerance: f64 = args.get("tolerance", 1e-6);
+    let max_chi: usize = args.get("max-chi", 16);
+    let entangle = !args.flag("no-entangle");
+    let scaling = match args.text("scaling", "pinned").as_str() {
+        "pinned" => Scaling::Pinned,
+        "trainable" => Scaling::Trainable,
+        other => fail(&format!(
+            "--scaling must be pinned or trainable, got {other:?}"
+        )),
+    };
+
+    let ansatz = SpectralControlAnsatz::build(qubits, layers, scaling, entangle);
+    let policy = match args.text("policy", "raw").as_str() {
+        "raw" => Policy::raw(ansatz),
+        "softmax" => Policy::softmax(ansatz, args.get("beta", 1.0)),
+        other => fail(&format!("--policy must be raw or softmax, got {other:?}")),
+    };
+    let cfg = TrainConfig {
+        episodes: args.get("episodes", 4000),
+        batch_size: args.get("batch", 50),
+        learning_rate: args.get("lr", 0.05),
+        eval_nodes: 256,
+        record_every: 1000,
+    };
+    let env = SpectralControl::new(k);
+    let mut r = rng(seed);
+    let mut params = initial_params(&policy, 0.3, 1.0, &mut r);
+    if !policy.ansatz.lambda_range().is_empty() {
+        let lambda = coarse_tune_lambda(&policy, &params, k, 8.0, 200);
+        for idx in policy.ansatz.lambda_range() {
+            params[idx] = lambda;
+        }
+    }
+    let out = train(&policy, &params, &env, &cfg, &mut r);
+    let trained = out.params.clone();
+
+    let report = overtone_mps::dequantize(
+        qubits,
+        k,
+        64,
+        max_chi,
+        tolerance,
+        |s| policy.ansatz.build(&[s]).run(&trained),
+        |st| policy.prob_from_observable(&trained, policy.observable.expectation(st)),
+    );
+
+    println!("# overtone dequantize");
+    println!("qubits {qubits}  layers {layers}  k {k}  seed {seed}");
+    println!("exact return        {:+.6}", report.exact_return);
+    println!("tolerance           {:.0e}", report.tolerance);
+    println!();
+    println!(
+        "{:>5} {:>18} {:>16} {:>14}",
+        "chi", "max policy error", "mean fidelity", "return"
+    );
+    for row in &report.rows {
+        println!(
+            "{:>5} {:>18.3e} {:>16.9} {:>+14.6}",
+            row.chi, row.max_policy_error, row.mean_fidelity, row.achieved_return
+        );
+    }
+    println!();
+    println!("verdict: {}", report.verdict());
 }

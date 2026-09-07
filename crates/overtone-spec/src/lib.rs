@@ -11,10 +11,12 @@
 pub mod entropy;
 pub mod fft;
 pub mod plateau;
+pub mod qfim;
 pub mod spectrum;
 
 pub use entropy::{bipartition, half_chain_entropy, Bipartition};
 pub use plateau::{
     fit_exponential, sweep, CostLocality, DepthPolicy, ExponentialFit, PlateauPoint,
 };
+pub use qfim::{qfim, qfim_spectrum, rank};
 pub use spectrum::{spectrum_of, Spectrum};

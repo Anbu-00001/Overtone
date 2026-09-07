@@ -4,6 +4,9 @@ members = [
     "crates/overtone-sim",
     "crates/overtone-rl",
     "crates/overtone-spec",
+    "crates/overtone-lie",
+    "crates/overtone-gsim",
+    "crates/overtone-mps",
     "crates/overtone-cli",
     "crates/overtone-wasm",
 ]
@@ -17,6 +20,11 @@ repository = "https://github.com/overtone-qrl/overtone"
 
 [workspace.dependencies]
 overtone-sim = { path = "crates/overtone-sim" }
+overtone-rl = { path = "crates/overtone-rl" }
+overtone-spec = { path = "crates/overtone-spec" }
+overtone-lie = { path = "crates/overtone-lie" }
+overtone-gsim = { path = "crates/overtone-gsim" }
+overtone-mps = { path = "crates/overtone-mps" }
 # No entropy source, deliberately: every random draw in this workspace is seeded
 # explicitly (Part I 5, determinism). Dropping default features removes the getrandom
 # dependency entirely, which both enforces that invariant and lets the core crates build

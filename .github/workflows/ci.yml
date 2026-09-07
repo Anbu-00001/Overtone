@@ -46,9 +46,36 @@ jobs:
           # browser, so good_lp must stay on a pure-Rust backend.
           cargo build -p overtone-rl --target wasm32-unknown-unknown
           cargo build -p overtone-spec --target wasm32-unknown-unknown
+          # Part III's Closure chapter runs in the browser too: the closure engine and
+          # g-sim both have to cross to wasm32.
+          cargo build -p overtone-lie --target wasm32-unknown-unknown
+          cargo build -p overtone-gsim --target wasm32-unknown-unknown
 
       - name: JS budget
         run: ./scripts/check_js_budget.sh
+
+      # Part III's numbers are measurements, not unit tests, and they are slow in debug.
+      # Each of these backs a sentence in the README.
+      - name: Theorem 1 reproduces at depth 64
+        run: |
+          cargo run --release -q -p overtone-gsim --example theorem_one | tee /tmp/t1.txt
+          grep -qE '^ 7 +91 +1 +0\.065934 +64 +0\.0(6[5-9]|7[0-2])' /tmp/t1.txt
+
+      - name: A hundred-qubit policy trains
+        run: |
+          cargo run --release -q -p overtone-gsim --example hundred_qubit_policy | tee /tmp/hq.txt
+          grep -qE 'return after +\+0\.2[0-9]' /tmp/hq.txt
+
+      - name: The dequantization verdict is published whatever it says
+        run: |
+          cargo run --release -q -p overtone-cli -- dequantize --qubits 4 --layers 3 \
+            --k 3 --tolerance 1e-6 --max-chi 8 | tee /tmp/dq.txt
+          grep -q 'effective chi = 3' /tmp/dq.txt
+
+      - name: predict refuses the claim it cannot support
+        run: |
+          cargo run --release -q -p overtone-cli -- predict --qubits 4 --layers 2 \
+            | grep -q 'No trainability claim follows'
 
   browser:
     name: browser
@@ -88,6 +115,8 @@ jobs:
           grep -q 'id="loading"' dom.html && { echo "engine failed to boot"; exit 1; }
           grep -qE '<b id="r-ceiling">[0-9]+</b>' dom.html || { echo "readouts not populated"; exit 1; }
           grep -qE '<b id="hero-lambda">[0-9]' dom.html || { echo "hero did not run"; exit 1; }
+          grep -qE '<b id="cl-dim">28</b>' dom.html || { echo "closure did not run"; exit 1; }
+          grep -qE '<b id="cl-var">0\.1071</b>' dom.html || { echo "prediction not rendered"; exit 1; }
           echo "page booted and populated from the engine"
 
   oracle:

@@ -140,6 +140,52 @@
   </div>
 </section>
 
+
+<main>
+<section class="prose">
+  <h2>What the algebra knows before you train</h2>
+  <p>Take the generators of the circuit's gates and close them under nested commutators.
+  The set grows, alarmingly, and then stops. Its dimension is one integer, and that integer
+  predicts how flat the loss landscape will be, how many directions the circuit can move in,
+  and how many parameters it takes before the landscape stops having spurious minima —
+  <i>before a single gradient step</i>.</p>
+  <p>None of this needs a matrix. A Pauli string is two bitsets; two of them anticommute
+  when a symplectic form is odd, and their commutator is an XOR. The closure of a
+  hundred-qubit circuit fits in a browser tab.</p>
+  <p>The right-hand panel is the discipline that makes it a prediction rather than a
+  description. The line is computed from the algebra alone. The points are measured
+  afterwards, from circuits with random parameters. The line is drawn first, every time.</p>
+</section>
+</main>
+
+<section class="instrument">
+  <div class="controls">
+    <label>generators
+      <select id="cl-family">
+        <option value="2">transverse-field Ising</option>
+        <option value="0">Part I ansatz, entanglers fixed</option>
+        <option value="1">Part I ansatz, entanglers trainable</option>
+        <option value="4">XY model</option>
+        <option value="3">Heisenberg chain</option>
+        <option value="5">hardware-efficient</option>
+      </select>
+    </label>
+    <label>qubits <input id="cl-qubits" type="range" min="2" max="6" value="4"><b id="cl-qubits-value">4</b></label>
+    <button id="cl-replay">replay</button>
+  </div>
+  <div class="panel-grid pair">
+    <canvas id="c-closure"></canvas>
+    <canvas id="c-landing"></canvas>
+  </div>
+  <p class="readouts">
+    <span>dim(g) <b id="cl-dim">--</b></span>
+    <span>of 4^n-1 <b id="cl-su">--</b></span>
+    <span>Var[loss] <b id="cl-var">--</b></span>
+    <span>O = <b id="cl-obs">--</b></span>
+    <span class="dim" id="cl-verdict"></span>
+  </p>
+</section>
+
 <footer>
   <p><span id="version">overtone-sim</span> · every number on this page is computed in your
   browser by the same engine the tests run against · gradients verified against Yao.jl to

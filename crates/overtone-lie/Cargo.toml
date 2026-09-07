@@ -1,0 +1,11 @@
+[package]
+name = "overtone-lie"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Pauli bitset arithmetic, Lie closure, and the algebraic prediction report"
+
+[dependencies]
+overtone-sim.workspace = true

@@ -71,8 +71,11 @@ are local derived indexes and must not appear in a diff sent upstream.
 crates/
 ├── overtone-sim/    state vector, gates, adjoint + parameter-shift gradients
 ├── overtone-rl/     environments, policies, REINFORCE, rollout buffers
-├── overtone-spec/   instrumentation: Fourier, entropy, gradient variance, LP ceiling
-├── overtone-cli/    native trainer; emits JSONL traces
+├── overtone-spec/   instrumentation: Fourier, entropy, gradient variance, QFIM
+├── overtone-lie/    Pauli bitsets, Lie closure, dim(g), the prediction report
+├── overtone-gsim/   Lie-algebraic simulation: Givens rotations in the DLA basis
+├── overtone-mps/    bond spectra, truncation, the dequantization test
+├── overtone-cli/    native trainer, `predict`, `dequantize`; emits JSONL traces
 └── overtone-wasm/   wasm-bindgen surface for the browser
 ```
 
@@ -82,6 +85,9 @@ Dependency direction is one-way and load-bearing:
 - `overtone-rl` **knows nothing about rendering.** It consumes `sim` through a trait and
   must not reach into its internals.
 - `overtone-spec` reads circuits and policies and emits measurements.
+- `overtone-lie` **holds no matrices and no RNG.** It depends on `sim` only for the `Gate`
+  and `Pauli` types. The dense oracle that checks it lives in `tests/`, outside the library.
+- `overtone-gsim` depends on `lie` and `rl`; `overtone-mps` depends on `sim` and `rl`.
 - `overtone-wasm` is a thin FFI shim. **If it contains an `if` statement about physics,
   that logic is in the wrong crate.**
 
@@ -134,7 +140,17 @@ Credibility is the scarce resource in this field.
 - Do not use a density matrix for decoherence (Part II) — it destroys the sparse
   representation. Trajectories.
 - Do not compute Lie closures with dense matrices (Part III) — bitsets and XOR. A `2ⁿ`
-  matrix anywhere in `overtone-lie` is a bug.
+  matrix anywhere in `overtone-lie` is a bug. Tests are exempt and there is one.
+- **`dim(g)` describes an ansatz, not necessarily the circuit you have.** Ragone et al.'s
+  Theorem 1 needs the circuit to lie in `exp(g)`. A fixed CZ layer is a Clifford, not a
+  one-parameter subgroup, so a circuit with fixed entanglers is *not* in the `exp(g)` of its
+  trainable generators and no trainability claim follows from `dim(g)`. `Prediction`
+  refuses to make one; do not work around that. See `arXiv:2310.11505`.
+- The dequantization test is run and published whatever it says (Part III §13). The
+  unflattering answer is the contribution, and today the answer is that every agent here is
+  a `chi <= 4` tensor network.
+- The 100-qubit g-sim claim never appears without its caveat in the same paragraph:
+  polynomial `dim(g)` is why it trains *and* why it is classically simulable.
 - Do not interpolate animation frames. Discrete time is discrete.
 - **Every mechanic in `Braid` must be a theorem** (Part VI §0). Nothing is invented for
   balance. No HP, damage, XP or cooldowns — if a quantity is not a physical observable it

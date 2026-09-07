@@ -9,8 +9,21 @@ circuit. That is Schuld, Sweke and Meyer, *Phys. Rev. A* **103**, 032430 (2021).
 
 Overtone points that theorem at a reinforcement-learning policy in real time.
 
-**Status: Phase 4 of 9.** The simulator, both gradient paths, the RL loop, the LP ceiling,
-the spectral instrument and the browser demo are built and verified. See
+It also computes what a circuit can learn *before* you train it, from the algebra of its
+generators alone, and then trains the thing to show the prediction landing.
+
+**A hundred-qubit quantum RL policy trains exactly, in four seconds, on one CPU core.** Not
+sampled, not approximated: the transverse-field Ising algebra has dimension `n(2n-1)`, which
+is 19900 numbers at `n = 100` instead of `2^100` amplitudes, and the simulation is exact.
+**The caveat belongs in the same paragraph:** that works precisely because `dim(g)` is
+polynomial, and a polynomial `dim(g)` is exactly the condition for having no barren plateau.
+The circuits that train are the circuits that are classically simulable. That tension is the
+live question in the field, and this repository names it rather than routing around it.
+
+**Status: Phase 6 of 9.** The simulator, both gradient paths, the RL loop, the LP ceiling,
+the spectral instrument, the browser demo, the closure engine, g-sim and the dequantization
+test are built and verified. Phase 5, the lattice, is still open — Phase 6 depends only on
+Phase 1, and Part III §12 puts the closure animation in the minimum viable core. See
 [docs/PHASES.md](docs/PHASES.md) for the plan and [docs/spec/](docs/spec/) for the full
 build specification, Parts I to VI.
 
@@ -142,14 +155,84 @@ a mid-circuit probe gives `1.08`, not `2`.
 | Radix-2 FFT matches a naive DFT | `< 1e-12·N` | `1e-12·N` | `overtone-spec/src/fft.rs` |
 | Entanglement entropy matches closed forms | `< 1e-12` | `1e-12` | `overtone-spec/src/entropy.rs` |
 | Global gradient variance collapses exponentially | `2^(-1.03n)`, R²`=0.999` | — | `overtone-spec/src/plateau.rs` |
+| `dim(g)` matches the published classification | exact, 13 families | exact | `overtone-lie/tests/published_dimensions.rs` |
+| Bitset closure matches a dense Gram-Schmidt oracle | exact | exact | `overtone-lie/tests/dense_oracle.rs` |
+| Commutator signs match dense matrices | `< 1e-12` | `1e-12` | `overtone-lie/tests/dense_oracle.rs` |
+| Ragone et al. Theorem 1 reproduces | ratio `0.97`–`1.03` | 10% | `overtone-gsim/examples/theorem_one.rs` |
+| g-sim matches the state vector, value and gradient | `< 1e-12` | `1e-12` | `overtone-gsim/tests/against_state_vector.rs` |
+| `rank(QFIM) <= dim(g)` | holds, `n = 2..4` | exact | `overtone-cli/tests/algebra_meets_measurement.rs` |
+| A fixed-entangler ansatz escapes its own DLA | rank `> 3n` | — | `overtone-cli/tests/algebra_meets_measurement.rs` |
+| A hundred-qubit policy trains | `J: 0 -> 0.251` in 3.9 s | — | `.github/workflows/ci.yml` |
+| Every agent here is a small tensor network | `chi = 2..4` | — | `overtone-cli` `dequantize` |
+| MPS truncation is exact at full bond dimension | `< 1e-10` | `1e-10` | `overtone-mps/tests/truncation.rs` |
 | Native and wasm32 trajectories agree | `5.55e-16` | `1e-13` | `scripts/wasm_determinism.sh` |
 | The page boots and reads from the engine | headless Chrome | — | `.github/workflows/ci.yml` |
-| JavaScript stays a renderer | 580 lines | 800 | `scripts/check_js_budget.sh` |
+| JavaScript stays a renderer | 762 lines | 800 | `scripts/check_js_budget.sh` |
 
 84 tests. Every number in the measured column is produced by the suite, and is the worst
 case across the full sweep rather than a typical value.
 
-## Six things the specification did not say, that turned out to matter
+## The dequantization test, run on ourselves
+
+Part III §5 asks for an instrument that tries to disprove the project's own premise: compress
+a trained policy into a matrix product state and report the smallest bond dimension that
+reproduces it. Part III §13 adds that the answer is published whatever it says.
+
+Here is what it says.
+
+| Agent | Exact `J` | Effective `chi` at `1e-6` | `J` at `chi = 1` |
+|---|---|---|---|
+| RAW-PQC, `n = 2`, `L = 2` | 0.000000 | **2** | −0.008 |
+| RAW-PQC, `n = 3`, `L = 3` | 0.499313 | **2** | 0.504 |
+| RAW-PQC, `n = 4`, `L = 3` | 0.499609 | **3** | 0.505 |
+| RAW-PQC, `n = 5`, `L = 3` | 0.499346 | **4** | 0.509 |
+| RAW-PQC, `n = 4`, `L = 2`, `lambda` trainable | 0.502044 | **3** | 0.502 |
+| SOFTMAX-PQC, `n = 4`, `L = 3` | 0.603913 | **4** | 0.606 |
+
+Every agent in this repository is a small tensor network. Worse, read the last column: at
+`chi = 1` — a *product state*, no entanglement at all — the achieved return is not lower
+than the exact agent's. It is very slightly higher, because the truncation happens to nudge
+the policy toward the sign of `cos(k s)`. Whatever these agents are doing, entanglement is
+not what does it.
+
+That is not a defect in the instrument. It is the instrument working, and it is the reason
+this repository does not claim a quantum advantage anywhere.
+
+```
+overtone dequantize --qubits 4 --layers 3 --k 3
+```
+
+## What the algebra knows before you train
+
+```
+overtone predict --family tfim --qubits 5
+
+dim(g)              45
+dim su(2^n)         1023
+scaling             Polynomial
+observable          ZZIII
+Var[loss]           0.088889   (Ragone et al. 2024, Theorem 1)
+rank(QFIM) <=       45
+verdict: dim(g) = 45 of 1023 — polynomial: trainable, and therefore also classically
+         simulable by g-sim
+```
+
+`Var[loss] = 4/45` is a closed form, computed from the generators by XOR and popcount, with
+no circuit run. Measured over 4000 random circuits at depth 64: `0.088367`. The ratio of
+measurement to prediction across `n = 3..7` is 0.97, 1.03, 0.99, 0.97, 0.99.
+
+Point the same tool at our own Part I ansatz and it refuses to answer:
+
+```
+overtone predict --qubits 4 --layers 2
+
+caveat: 8 fixed entangling gates are not one-parameter subgroups of exp(g), so this
+        circuit is not in exp(g) and Theorem 1 does not apply to it.
+verdict: dim(g) = 12 of 255 for the trainable generators, but this circuit's fixed
+         entanglers put it outside exp(g). No trainability claim follows. Measure it.
+```
+
+## Nine things the specification did not say, that turned out to matter
 
 **The frequency ceiling counts encoding gates, not layers.** Part I states the reachable
 spectrum as `{-L..L}` for `L` layers. That holds only when each layer applies one encoding
@@ -212,6 +295,52 @@ ceiling reported the hero — an agent that had just tuned itself into resonance
 leaked, with a ratio of 28. The leakage readout is now suppressed as not meaningful whenever
 `λ` is trainable, because a non-integer reachable frequency spreads across neighbouring bins
 for ordinary sampling reasons that have nothing to do with the softmax.
+
+**Figure 2 of Ragone et al. is a schematic, so M11's acceptance test had nothing to
+reproduce.** Part III §9 asks the closure engine to "reproduce Figure 2 of Ragone et al.
+(2024)" and put the badge in the README. Figures 1 and 2 of that paper both illustrate
+*where* barren plateaus come from — expressiveness, entanglement, locality, noise — and
+neither is a numerical plot. What is reproducible, and is a better target, is Theorem 1
+itself:
+
+```
+Var[loss] = sum_j  P_{g_j}(rho) P_{g_j}(O) / dim(g_j)
+```
+
+an exact closed form with nothing to eyeball. The more interesting half is that the
+theorem's own hypothesis is visible in the data. It assumes the circuit is deep enough to be
+a 2-design over `exp(g)`; at `n = 7` the measured-to-predicted ratio is 1.86 at depth 1,
+1.64 at depth 8, 1.08 at depth 32 and 0.99 at depth 64. The prediction is not wrong when the
+circuit is shallow. Its premise is not yet true.
+
+**Our own ansatz is not described by its own dynamical Lie algebra.** "The hardware-efficient
+ansatz has DLA `su(2^n)`" is true when the entanglers are trainable and false when they are
+fixed. Part I §6.2 builds *fixed* CZ layers, so the algebra generated by the trainable gates
+is `su(2)^(+n)` — dimension `3n`, polynomial, which would say "trainable" — while Part I
+§6.7 measures that same circuit's global-observable gradient variance collapsing like
+`2^(-1.03 n)`. There is no contradiction: a fixed Clifford is not a one-parameter subgroup,
+the circuit is not in `exp(g)`, and Theorem 1 has no hypothesis to stand on. This is
+asserted by measurement rather than by argument — the circuit's Fisher rank exceeds `3n`,
+which an algebra containing it could not permit — and `overtone predict` refuses to make a
+trainability claim when fixed entanglers are present. Part III §14 lists Diaz et al.,
+arXiv:2310.11505 for precisely this gap; it is worth reading before quoting `dim(g)` at
+anyone.
+
+**A hundred-qubit agent scored exactly zero, and it was a theorem rather than a bug.** With
+generators `{X_q} ∪ {Z_qZ_{q+1}}`, observable `sum_q X_q` and one layer, the policy is an odd
+function of the observation for *every* parameter setting, so its correlation against
+`cos(k s)` vanishes identically and the gradient is zero in every direction. The proof is a
+conserved quantity: multiplying a Pauli string by `Z_aZ_b` toggles `X <-> Y` and `I <-> Z` at
+both sites, and a string only fails to commute with `Z_aZ_b` when exactly one of the two
+sites carries an `X` or a `Y` — so the number of `X`-or-`Y` letters never changes. Starting
+from `X_q` it is one forever, only `I`/`Z` strings survive in `|0...0>`, and reaching one
+costs exactly one factor of `sin(lambda s)`.
+
+The first version of that paragraph claimed it held at every depth. It does not: a second
+layer gives the variational `RX` gates a string with a `Z` to act on, the count can then
+visit two, and the parity is no longer pinned. The claim survived a test that had only ever
+reached one layer. Both directions are asserted now.
+
 
 ## Why three gradient checks and not one
 
@@ -293,8 +422,11 @@ julia --project=lab lab/test/oracle.jl
 ```
 crates/overtone-sim/    state vector, gates, adjoint and parameter-shift gradients
 crates/overtone-rl/     ansatz, policies, SpectralControl-k, REINFORCE, LP ceiling
-crates/overtone-spec/   FFT, spectrum, entropy, gradient variance
-crates/overtone-cli/    native trainer, JSONL traces
+crates/overtone-spec/   FFT, spectrum, entropy, gradient variance, QFIM
+crates/overtone-lie/    Pauli bitsets, Lie closure, the prediction (Phase 6)
+crates/overtone-gsim/   Lie-algebraic simulation and gradients      (Phase 6)
+crates/overtone-mps/    bond spectra and the dequantization test    (Phase 6)
+crates/overtone-cli/    native trainer, predict, dequantize
 crates/overtone-wasm/   wasm-bindgen surface                       (Phase 4)
 lab/                    Yao.jl oracle and heavy sweeps
 docs/spec/              the build specification, Parts I to VI

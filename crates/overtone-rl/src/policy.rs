@@ -36,7 +36,8 @@ pub struct Policy {
     pub ansatz: Ansatz,
     /// Inverse temperature. Ignored by RAW-PQC.
     pub beta: f64,
-    observable: Observable,
+    /// What the policy measures: `Z` on qubit zero (Part I 6.3).
+    pub observable: Observable,
 }
 
 /// Probabilities are clamped this far from the boundary before a logarithm is taken.
@@ -102,7 +103,12 @@ impl Policy {
         self.prob_from_observable(params, z)
     }
 
-    fn prob_from_observable(&self, params: &[f64], z: f64) -> f64 {
+    /// The Born or softmax rule applied to an already-measured observable value.
+    ///
+    /// Public so that a consumer holding a state from elsewhere -- the dequantization test
+    /// compresses the state first -- maps it to a probability through the same rule the
+    /// policy itself uses, rather than reimplementing it and drifting.
+    pub fn prob_from_observable(&self, params: &[f64], z: f64) -> f64 {
         match self.kind {
             // Born rule. Already in [0, 1] because |<Z>| <= 1.
             PolicyKind::Raw => (1.0 + z) * 0.5,

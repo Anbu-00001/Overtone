@@ -15,3 +15,6 @@ path = "src/main.rs"
 overtone-sim.workspace = true
 overtone-rl = { path = "../overtone-rl" }
 overtone-spec = { path = "../overtone-spec" }
+overtone-lie.workspace = true
+overtone-gsim.workspace = true
+overtone-mps.workspace = true
