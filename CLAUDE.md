@@ -85,6 +85,7 @@ crates/
 ├── overtone-qd/     MAP-Elites over policy agents: the Menagerie archive
 ├── overtone-graph/  maze Laplacian, shared eigenbasis, LMDPs, eigenoptions, Go-Explore
 ├── overtone-opt/    shot budgets, four optimisers, the barren-plateau flatline
+├── overtone-orbit/  Orbit: reachable sets, checkmate, the ladder, the endgame, the dial
 ├── overtone-cli/    native trainer, `predict`, `dequantize`; emits JSONL traces
 └── overtone-wasm/   wasm-bindgen surface for the browser
 ```
@@ -283,3 +284,23 @@ Credibility is the scarce resource in this field.
   has the wrong sign — gates track layers, layers track the frequency ceiling — and the
   `dim(g)` term carries no signal at widths where there is no plateau to be saved from.
   Verified per term, as Part V §10 requires; do not restore the combined form.
+
+- **Checkmate is sound, not complete, and the gap is a dimension count** (Part VII §3). The
+  commutant plus per-ideal `g`-purity is the degree-≤2 truncation of a separating invariant
+  ring. When `2·2^n − 2 − k > dim(orbit)` the level set holds a continuum of orbits and no
+  such certificate can separate them. Never soften it into a score threshold; never claim it
+  is exact either.
+- **Do not measure orbit completeness on Haar-random pairs.** They disagree on every
+  invariant, so the certificate scores 1.000 on a family that is provably incomplete. Build
+  pairs that share the invariants, and report the game-relevant number separately.
+- **An exactly-0.500 ladder is a bug signature, not a flat game.** It means the outcome does
+  not depend on the strategy — in Orbit's case that the two players never interacted. Check
+  that the opponent is actually in the loop before reporting depth.
+- **`d` is a count of steps against a declared language, not a span of compute** (Lantz et
+  al.). A saturating ladder may be a fact about the language: a depth-1 policy has only
+  `|moves| × |angles|` candidates, so budget stops buying at that point.
+- **A pursuer spread uniformly absorbs nothing.** The absorbing threshold is `1/dim`, so a
+  field thinned across the window threatens no cell.
+- **`Lmdp::recommended_rho` is for the `z`-space solve only.** It caps `rho` at 60 to keep
+  `exp(-rho D)` representable. In log space there is no floor and the cap only costs accuracy;
+  choose `rho` for accuracy alone, around `40 D`.

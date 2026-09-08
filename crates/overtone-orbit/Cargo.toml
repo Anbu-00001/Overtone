@@ -1,0 +1,18 @@
+[package]
+name = "overtone-orbit"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Orbit: reachable sets, the checkmate predicate, and the strategy ladder"
+
+[dependencies]
+overtone-sim.workspace = true
+overtone-lie.workspace = true
+overtone-gsim.workspace = true
+overtone-mps.workspace = true
+overtone-graph.workspace = true
+overtone-wfc.workspace = true
+rand.workspace = true
+rand_chacha.workspace = true

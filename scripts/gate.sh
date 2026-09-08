@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The gate. Every claim in the README has a line here that fails when it stops being true.
 #
-# Run from the repository root. Phases 1-8.
+# Run from the repository root. Phases 1-9.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
@@ -33,14 +33,14 @@ expect() {
   fi
 }
 
-echo "PHASE 1-8 GATE"
+echo "PHASE 1-9 GATE"
 
 run "cargo fmt --check"                cargo fmt --all -- --check
 run "clippy -D warnings"               cargo clippy --workspace --all-targets -- -D warnings
 run "clippy (parallel)"                cargo clippy -p overtone-sim --features parallel --all-targets -- -D warnings
 run "cargo test --workspace"           cargo test --workspace
 run "cargo test (parallel)"            cargo test -p overtone-sim --features parallel
-for c in sim rl spec lie gsim walk wfc qd graph opt; do
+for c in sim rl spec lie gsim walk wfc qd graph opt orbit; do
   run "overtone-$c -> wasm32"          cargo build -p "overtone-$c" --target wasm32-unknown-unknown
 done
 run "wasm-pack build"                  wasm-pack build crates/overtone-wasm --target web --out-dir pkg --release
@@ -127,6 +127,23 @@ expect "the gate-count penalty has the wrong sign" \
 expect "reach alone beats the combined reward" \
   'reach alone, as a selector: top 20 mean J 0\.[56]' \
   cargo run --release -q -p overtone-qd --example architecture
+
+# Phase 9, M34-M37. Orbit is headless, so every claim is asserted from the examples.
+expect "the certificate is sound on every pair" \
+  'soundness held on every pair' \
+  cargo run --release -q -p overtone-orbit --example checkmate
+
+expect "the certificate is incomplete by counting" \
+  'local X    4         30         4            8            4         18' \
+  cargo run --release -q -p overtone-orbit --example checkmate
+
+expect "checkmate is complete against real positions" \
+  'TFIM    4          30             30               30         1.000' \
+  cargo run --release -q -p overtone-orbit --example checkmate
+
+expect "the branching factor lands in the band" \
+  'pawn 4, rook 4, bishop 6, knight 12' \
+  cargo run --release -q -p overtone-orbit --example ladder
 
 # The page must boot and populate its readouts from the engine, Closure chapter included.
 if command -v google-chrome >/dev/null 2>&1; then

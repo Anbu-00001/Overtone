@@ -20,12 +20,13 @@ polynomial, and a polynomial `dim(g)` is exactly the condition for having no bar
 The circuits that train are the circuits that are classically simulable. That tension is the
 live question in the field, and this repository names it rather than routing around it.
 
-**Status: Phase 8 of 11, complete.** The simulator, both gradient paths, the RL loop, the LP
+**Status: Phase 9 of 11, complete.** The simulator, both gradient paths, the RL loop, the LP
 ceiling, the spectral instrument, the browser demo, the closure engine, g-sim, the
 dequantization test, the substrate worlds, the transport instrument, the maze eigenbasis, the
 linearly-solvable MDP, the optimiser flatline, the quantile critic and shot dial, eigenoptions
-with Go-Explore, and architecture search with its verification are built and verified — 48
-gates, green. Phase 5, the lattice, is **partial**: Part IV's worlds cannot be measured without a
+with Go-Explore, and architecture search with its verification, and Orbit's win condition, turn loop, endgame tablebase and complexity
+dial are built and verified. Phase 9 is headless by design: Part VII forbids an interface
+before the game's depth has been measured. Phase 5, the lattice, is **partial**: Part IV's worlds cannot be measured without a
 walk, so the one-dimensional core of Part II's M6 and M7 was built early, and what remains
 is everything two-dimensional. See [docs/PHASES.md](docs/PHASES.md) for the plan and
 [docs/spec/](docs/spec/) for the full build specification, Parts I to VIII plus the VI-A
@@ -282,6 +283,16 @@ property of the state. WFC has no phase, so nothing in it can ever interfere.
 | The reach term predicts the trained return | `rho = 0.62` | `> 0.4` | `overtone-qd/tests/architecture.rs` |
 | The gate-count penalty has the wrong sign | `rho = -0.49` | `< -0.2` | `overtone-qd/tests/architecture.rs` |
 | The combined reward loses to its own reach term | `0.60` vs `0.35` | — | `overtone-qd/tests/architecture.rs` |
+| The commutant commutes with all of `g` | every pair | exact | `overtone-orbit/tests/orbit.rs` |
+| Orbit invariants are conserved along the orbit | `< 1e-9` | `1e-9` | `overtone-orbit/tests/orbit.rs` |
+| The checkmate certificate is never wrong | 0 false positives | exact | `overtone-orbit/tests/orbit.rs` |
+| It is provably incomplete by counting | deficit 18 at `n=4` | `> 0` | `overtone-orbit/tests/orbit.rs` |
+| ...and complete against real positions | `30/30` | exact | `overtone-orbit/tests/orbit.rs` |
+| A bishop conserves square colour, a pawn does not | commutes / does not | exact | `overtone-orbit/tests/game.rs` |
+| Branching factor lands in the 25-40 band | 30 at `n=4` | `25..=40` | `overtone-orbit/tests/game.rs` |
+| The endgame tablebase matches brute force | every cell, 3 mazes | exact | `overtone-orbit/tests/endgame.rs` |
+| The endgame solves inside 100 ms | 16x12 maze | `100 ms` | `overtone-orbit/tests/endgame.rs` |
+| The dial moves from evaluable to hard | both ends | exact | `overtone-orbit/tests/dial.rs` |
 | JavaScript stays a renderer | 1186 lines | 1200 | `scripts/check_js_budget.sh` |
 
 84 tests. Every number in the measured column is produced by the suite, and is the worst
@@ -679,6 +690,7 @@ crates/overtone-wfc/    Wave Function Collapse, which is not physics (Phase 7)
 crates/overtone-qd/     MAP-Elites: the Menagerie archive             (Phase 7)
 crates/overtone-graph/  maze Laplacian, eigenbasis, LMDP, eigenoptions (Phase 8)
 crates/overtone-opt/    shot budgets, four optimisers, the flatline   (Phase 8)
+crates/overtone-orbit/  Orbit: checkmate, the ladder, the endgame      (Phase 9)
 crates/overtone-cli/    native trainer, predict, dequantize
 crates/overtone-wasm/   wasm-bindgen surface                       (Phase 4)
 lab/                    Yao.jl oracle and heavy sweeps

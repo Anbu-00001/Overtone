@@ -613,7 +613,7 @@ panel that prints its own error against solving the composite task from scratch.
 
 ---
 
-## Phase 9 — Orbit: the game, headless  *(M34–M37)*
+## Phase 9 — Orbit: the game, headless  *(M34–M37)*  — DONE
 
 **Spec:** Part VII. **Gated on Phases 5, 6 and 8.** **No interface is built in this phase.**
 
@@ -657,147 +657,100 @@ Seven lines. **If a rule needs a paragraph, cut it.**
 
 ---
 
-**M34 — checkmate.** The reachable-orbit computation from `g`, and the checkmate predicate.
-Build this first: it is what makes the thing a game rather than a sandbox, and most of it is
-already in `overtone-lie`.
+**M34 — checkmate — done.** `overtone-orbit` computes the reachable-orbit certificate and
+the check and checkmate predicates. Check is exact: it is an expectation value. Checkmate is
+**sound and not complete**, and the shape of that gap turned out to be the whole story.
 
-Checkmate is not a score threshold. Dynamical Lie algebras come from quantum control theory,
-and controllability is exactly what they compute: if `g = su(2^n)` the system is fully
-controllable and every state is reachable; if `g` is a proper subalgebra the reachable set is
-an **orbit**, and states outside it are unreachable in principle. **Check** is having overlap
-with the pursuer's absorbing subspace; **checkmate** is that remaining true at every point of
-the reachable orbit.
+**M35 — the strategy ladder — done, and it caught a design fault before any interface.**
+Generator basis, turn loop, and `d`, all headless.
 
-> **The exchange rate between material and position is a published theorem.** Absorbing an
-> agent grows your algebra, which grows your orbit, which makes checkmate harder to deliver
-> against you — that is material. The cost is `Var[∂C] ∝ 1/dim(g)`: a larger algebra means
-> you can no longer learn — that is position. In chess the value of a bishop is a convention
-> refined by tradition; here it is a measured quantity with a citation.
+**M36 — the endgame eigensolve — done.** `Tablebase::solve` reuses Phase 8's `Lmdp`.
 
-**The technical risk, stated before building.** "Decidable from `g`, computable in
-milliseconds" is true at the two ends and not obviously true in between. Deciding whether a
-*specific* target state lies in the orbit of a *specific* initial state under a proper
-subgroup is a harder question than computing `dim(g)`. What is genuinely cheap:
+**M37 — the complexity dial — done.** Two independent representations, `g`-sim and MPS, with
+the verdict written as "hard only when **both** fail" rather than as one threshold.
 
-- **Full controllability.** `dim(g) = 4^n - 1` implies transitivity: never checkmate. Exact,
-  and already implemented.
-- **Conserved invariants.** The adjoint action of `exp(g)` on the DLA basis is *orthogonal*,
-  so the `g`-purity of each simple ideal — `P_j = sum_{alpha in g_j} <psi|b_alpha|psi>^2` —
-  is constant along the orbit. `overtone-lie` already computes it and `overtone-gsim`
-  already evolves it. Differing invariants **prove** unreachability in `O(dim g)`.
+**Exit criteria — met, with one qualified**
+- Soundness is exact: across every algebra, width and position family tested, the certificate
+  never contradicted the brute-force search. Zero false checkmates.
+- The brute-force oracle finds 8 of 8 paths that exist by construction, so a completeness
+  number measured against it is measuring the certificate rather than the search.
+- Branching factor **30 at `n = 4`**, inside Part VII §9.2's 25–40 band by construction, and
+  reported as a measured statistic. `n = 3` gives 18 and `n = 5` gives 45, both outside it.
+- `d = 6` at `n = 4`, against a bar of 4. **Qualified:** the curve is *not* still rising at
+  the top of the ladder — see the corrections below for why that is a fact about the strategy
+  language rather than about the game.
+- The endgame tablebase matches breadth-first optimal play exactly on three independent
+  mazes, and solves a 16×12 maze in **under 100 ms**.
+- One session moves a position from "`g`-sim and MPS both work" to "neither has an efficient
+  description", which is Part VII §6's acceptance.
 
-That gives a **sound certificate**, not a decision procedure: it proves "definitely
-unreachable" and never "definitely reachable". For a win condition that is the correct
-direction — a game must never end in a checkmate that is not one. The predicate may *miss*
-checkmates, which makes games longer rather than wrong.
+**Corrections carried forward from the build**
+- **"Decidable from `g`, computable in milliseconds" is false as stated, and the certificate
+  is provably incomplete by counting.** `exp(g)` is compact, so the ring of invariant
+  polynomials separates orbits and is finitely generated (Hilbert–Nagata) — a complete
+  certificate exists *in principle*. What is cheap is the degree-≤2 truncation: the commutant
+  (exactly conserved, linear) and the per-ideal `g`-purity (quadratic). Truncating leaves it
+  sound and not complete, and the gap is a dimension count, not bad luck. Pure states of `n`
+  qubits form a manifold of dimension `2·2^n − 2`; fixing `k` invariants cuts it to
+  `2·2^n − 2 − k`; the orbit inside has dimension at most `dim(g)`. Measured deficits: local
+  X at `n = 4` gives `30 − 8 − 4 = 18`, so the level set holds a **continuum** of distinct
+  orbits. TFIM at `n = 3` gives exactly `0` — and there the certificate *is* complete.
+- **Measuring completeness on two Haar-random states reports 1.000 for a certificate that is
+  provably not complete.** Two random states disagree on essentially every invariant, so the
+  certificate fires trivially. On pairs *constructed to share* the invariants it is **0.000**.
+  The two numbers differ by the whole of the effect, and only the second is a test.
+- **But the game never visits that region, and that is what makes the predicate playable.**
+  A safe region in Orbit is a set of maze cells — computational basis states — not an
+  adversarially chosen point on an invariant level set, and an opponent cannot choose it
+  because it is the maze's geometry. Measured against basis-state safety: **completeness
+  1.000** at every algebra and both widths, with zero soundness violations. So Part VII §11's
+  "verify the predicate is exactly correct" holds for the position distribution the game
+  produces, and fails as a general claim. Both halves are reported.
+- **`d = 0` with every win rate at exactly 0.500 is not a flat ladder, it is an absent
+  opponent.** The first turn loop gave both players a *fixed* safe subspace, so neither move
+  affected the other and the game was two solitaires: seat 0 won 20 of 20 at every budget from
+  1 to 128, and colour-swapping averaged that to exactly 0.500 on every rung. Part VII §3
+  says check is overlap with **the pursuer's** absorbing subspace, and the pursuer is the
+  opponent — the safe set has to be computed from the opponent's amplitude field. With that
+  coupling restored, `d = 6` at `n = 4`. The lesson generalises: an exactly-0.500 ladder is a
+  bug signature, not a measurement.
+- **A pursuer spread uniformly absorbs nothing.** The threshold is `1/dim`, so "the pursuer is
+  here more than a uniformly spread field would be" — and a field thinned across the whole
+  window threatens no particular cell. A test asserting the opposite was wrong about the
+  physics, not about the code.
+- **Reusing `recommended_rho` in the endgame reintroduced the bug that log space had
+  removed.** That function caps `rho` at 60 to keep `exp(−ρD)` above the `f64` floor, which is
+  a constraint of the *`z`-space* solve. `shortest_paths_stable` works in log space where
+  there is no floor, so the cap only costs accuracy: at `ρ = 60` on a diameter-36 maze the
+  error is still near 0.5, and a true distance of 14 came back as 15. `ρ` is now chosen for
+  accuracy alone, `40·D`. A safety cap carried across a representation change is worth
+  checking whenever the representation is what made it unnecessary.
+- **Cantwell's Quantum Chess: the claim is confirmed, the attribution was not.** The full
+  paper does replace checkmate with king capture — rule 5, "There is no concept of check or
+  checkmate. Kings are captured like any other piece", with rule 10 awarding the win at zero
+  king probability. Two things this plan previously got wrong: the paper **has no abstract**
+  (it opens directly into §1), so a quotation attributed to one cannot be right; and the
+  sentence in question is in the **conclusion** and says the game "remains **simulable**", not
+  "tractable for a classical computer". The mechanism is also not a measurement rule as such
+  but rule 2 — no square may ever have non-zero probability of holding two pieces — enforced
+  by projective measurements built for it. Part VII inverts *that constraint*, not measurement
+  in general.
 
-**Acceptance, restated.** Part VII asks to "verify against brute-force reachability that the
-predicate is exactly correct." Soundness is the part that must hold exactly: on small
-systems, **every position the predicate calls checkmate is verified unreachable by brute
-force, with zero false positives.** Completeness is then a *measured* quantity — report the
-fraction of genuine checkmates the cheap certificate misses. If that gap is small the game
-is playable as specified; if it is large, the honest options are a more expensive predicate
-or a stated rule that checkmate means *provable* checkmate. Do not soften it into a score
-threshold: Part VII §12 is right that this is the single change that would turn the whole
-design back into a toy.
-
-*(Prior art, to be stated as a technical note and not as a dunk: Cantwell's Quantum Chess
-(arXiv:1906.05836) introduces a measurement rule that, in its own abstract's words, "helps
-limit the size of the superposition, so the game remains tractable for a classical computer."
-Part VII deliberately inverts that decision. The claim that it also replaces checkmate with
-king-capture is plausible but is **not** confirmed by the abstract — read the full paper
-before putting it in the docs.)*
-
----
-
-**M35 — the strategy ladder.** Generator basis, turn loop, and the depth measurement, all
-headless. **No interface.**
-
-**Three corrections to how `d` is defined, from reading the source rather than the summary.**
-Lantz, Isaksen, Jaffe, Nealen and Togelius, *Depth in Strategic Games*, AAAI 2017, is the
-load-bearing reference, and Part VII §0 paraphrases it in a way that changes what gets built:
-
-1. **`d` is a count of steps, not a length in orders of magnitude.** The paper's procedure is
-   explicit: plot the best strategy at each computational-resource level, then walk the curve
-   counting how many times strength improves by at least a declared *step unit*. "The number
-   of steps you have counted is the `d` for this game for the given settings." Part VII §11's
-   acceptance — "a rising region spanning at least three orders of magnitude of compute" — is
-   a different quantity. Both are worth reporting; only one of them is `d`.
-2. **`d` is relative to a declared strategy language.** "Any observations made about a game's
-   depth based on this model must refer to the language selected." Overtone's language must
-   be written down before the number is quoted, or the number means nothing.
-3. **There are no published `d` values to compare against — for any game.** The paper is a
-   proposal. Applying the model to Tic Tac Toe, Blackjack and 3x3 Go is listed as *future
-   work*, and it says outright that the complete model "assumes knowledge, not only of a
-   strategy for playing perfectly, but also of the minimal computational resources needed for
-   such perfect play", which "makes the model impossible to apply completely to complex,
-   real-world games." **M39 cannot be a plotting exercise against published numbers.**
-
-**One place Overtone is better placed than the paper's own examples.** It weighs win rate
-against quality-of-move as the strength metric, prefers quality-of-move for being "more
-simply, clearly, and consistently defined", and rejects it because it needs perfect play.
-Overtone *has* perfect play in the decohered endgame, exactly, from M36's eigensolve. So the
-strength metric can be quality-of-move where the paper could only wish for it, and win rate
-elsewhere. That is a real methodological advantage and it should be used and said.
-
-**Exit criteria — declared before measuring, per the C2 rule.**
-- The strategy language, the CR ladder (powers of two in search budget), and the step unit
-  (a 65% win rate, mid-range of the paper's 60–75%) are all written down **first**.
-- Measured average legal-move count reported per game, targeting **25–40**, as chess reports
-  ~35. A measured statistic, never a design intention.
-- `d >= 4` steps with the curve still rising at the top of the ladder.
-- **If `d` is small, report it and retune.** Substrate, generator-basis size, coherence
-  budget, `k` and trap density are all knobs and `d` says which way to turn them. This is the
-  stop-the-line gate: **do not proceed to Phase 10 on a flat ladder.** Part VII §12 —
-  building the interface first means being attached to it by the time the number arrives.
-
----
-
-**M36 — the endgame eigensolve.** The LMDP tablebase, triggered by full decoherence.
-
-Axiom II's arrow gives the game chess's phase structure for free: openings are coherent and
-classically hard, middlegames are partially decohered and searched, and the endgame is fully
-decohered — a classical MDP, and therefore **exactly solvable**. Part V §2's linearly-solvable
-MDP turns Bellman into a largest-eigenvalue problem under `z = exp(-v/lambda)`.
-
-> **Overtone's endgame tablebase is an eigenvector.** Chess endgame tablebases cost decades
-> of compute and terabytes; this one is a Perron–Frobenius eigenvector computed live, in
-> front of the player, the moment coherence runs out.
-
-Tempo is coherence, and it is physical rather than conventional. Zugzwang appears without
-being designed, because evolving coherently is usually better than measuring and yet you must
-sometimes measure to aim — and the Zeno structure makes the *option* to measure a liability.
-
-**Dependency, load-bearing.** This is Part V §2, which lives in Phase 8, and it needs a maze
-with a goal, which is Phase 5. Neither is optional. Within Phase 8, **build §2 first**: it is
-promoted from "a striking panel" to infrastructure that two later milestones rest on.
-
-**Exit criteria:** the exact solution appears within 100 ms of the coherence transition, and
-matches brute-force optimal play on small boards.
-
----
-
-**M37 — the complexity dial.** Part VII §6 as an interface control, with a live verdict on
-whether the current position is efficiently evaluable, backed by the Phase 6 dequantization
-test.
-
-```
-low  dim(g), low  chi  ->  g-sim and MPS both work  ->  positions efficiently evaluable
-high dim(g), high chi  ->  no efficient classical representation exists  ->  provably hard
-```
-
-> **A slider that moves the game between the complexity class of checkers and a class
-> strictly beyond chess.** Chess is a fixed point in complexity space; Overtone is a
-> trajectory through it, and the player holds the parameter.
-
-This is the strongest claim in the series and the one no board game can make. Part VII §12:
-**do not hide it.**
-
-**Exit criteria:** in one session, a position whose optimal move is computed exactly by the
-M36 eigensolve, and then — one slider away — a position the dequantization test certifies has
-no efficient classical representation.
-
----
+**Outstanding**
+- **The ladder saturates because of the language, and the saturation point scales with it —
+  but not the way first predicted.** A depth-1 policy has only `|legal moves| × |angle grid|`
+  distinct candidates: 240 at `n = 4`, 360 at `n = 5`. The last rung clearing the step unit
+  moves from **64 to 128** as the candidate set grows, which is the evidence that the flatness
+  is a property of the language and not of the game — Lantz et al.'s correction 2 exactly.
+  The prediction that saturation would arrive *at* the candidate count was wrong: it arrives
+  at roughly a quarter of it, because sampling `b` of `N` candidates already lands near the
+  top `1/b` quantile, so returns diminish long before enumeration. Establishing whether the
+  *game* has more depth needs a richer language — deeper lookahead — not a different game.
+  (The `d` values from the two ladders are not comparable: the `d = 6` figure used budgets
+  1–128 over 40 games per rung, the scaling check used 16–256 over 12. A `d` is only ever
+  quotable against its own settings, which is correction 2 again.)
+- Phase 10 remains gated. `d = 6` clears the bar of 4, but the "still rising at the top"
+  half of the criterion is not met under this language, and that is the honest reading.
 
 ## Phase 10 — Orbit: the board  *(M38, M39)*
 
