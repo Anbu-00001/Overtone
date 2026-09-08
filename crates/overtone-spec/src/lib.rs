@@ -13,6 +13,7 @@ pub mod fft;
 pub mod plateau;
 pub mod qfim;
 pub mod spectrum;
+pub mod stats;
 
 pub use entropy::{bipartition, half_chain_entropy, Bipartition};
 pub use plateau::{
@@ -20,3 +21,4 @@ pub use plateau::{
 };
 pub use qfim::{qfim, qfim_spectrum, rank};
 pub use spectrum::{spectrum_of, Spectrum};
+pub use stats::spearman;

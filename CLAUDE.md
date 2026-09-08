@@ -86,6 +86,7 @@ crates/
 ├── overtone-graph/  maze Laplacian, shared eigenbasis, LMDPs, eigenoptions, Go-Explore
 ├── overtone-opt/    shot budgets, four optimisers, the barren-plateau flatline
 ├── overtone-orbit/  Orbit: reachable sets, checkmate, the ladder, the endgame, the dial
+├── overtone-cgt/    short games, thermography, temperature, decomposition search
 ├── overtone-cli/    native trainer, `predict`, `dequantize`; emits JSONL traces
 └── overtone-wasm/   wasm-bindgen surface for the browser
 ```
@@ -304,3 +305,39 @@ Credibility is the scarce resource in this field.
 - **`Lmdp::recommended_rho` is for the `z`-space solve only.** It caps `rho` at 60 to keep
   `exp(-rho D)` representable. In log space there is no floor and the cap only costs accuracy;
   choose `rho` for accuracy alone, around `40 D`.
+
+- **CGT temperature is defined for games of no chance** (Berlekamp, verbatim: "two-person,
+  perfect information games of no chance"). Overtone's measurement is a chance node, so every
+  temperature is a temperature of the **coherent segment** between collapses. Do not average a
+  temperature across a measurement.
+- **"Move in the hottest region" is a heuristic, not a theorem.** `{0|-3} + {{1|-2}|-3}` with
+  Left to move has distinct temperatures 1.5 and 1.0 and loses a point to hottest-first,
+  because the colder component's option is hotter than the component. It *is* exact on sums of
+  plain switches, which is the case the theory covers. Use temperature for ordering; never
+  claim optimality.
+- **A game can be a number without any option list being all-numeric.** `{{-1|-2} | 1}` is a
+  number by the simplicity rule, and `overtone-cgt` reports a meaningless temperature for
+  those by design. Filter generated games through `Game::is_hot` before searching over them;
+  the first hottest-first "counterexample" found was this bug.
+- **Both Overtone temperatures climb with the ply.** A raw correlation between CGT temperature
+  and von Neumann entropy is mostly a correlation with time: 0.344 raw, -0.021 with the ply
+  partialled out, sign mixed. Partial out the ply before reporting any trajectory correlation
+  in this repo.
+- **The Chinese Rings is not two thousand years old.** The Zhuge Liang attribution is Culin
+  via an unnamed informant; the documented references are Yang Shen (early 16th c.) and
+  Pacioli (1509). It is therefore not "older than algebra" either. The argument does not need
+  the date — use `overtone_graph::rings::PROVENANCE`.
+- **Grover over-rotation has no floor; a die does.** Disadvantage bottoms out at `p^2`; keep
+  turning the dial and the marked outcome becomes arbitrarily unreachable. How far you must
+  turn is an equidistribution question about `theta/pi` and is not monotone in register size.
+- **An Elo ladder over submitted agents is a skill chain, not a strategy ladder.** Lantz et
+  al. separate the two explicitly and require a *declared language* plus a computational-
+  resource axis for `d`. A league of independently-designed agents has neither, so its Elo
+  spread is not `d`. Report both, labelled. The same paper warns that random elements loosen
+  the link between decisions and outcomes, which applies to every win-rate measurement in this
+  repo, Phase 9's ladder included.
+- **Mahadev (FOCS 2018) is a classical verifier and a *quantum* prover, under LWE.** The
+  asymmetry there is quantum-vs-classical. Overtone's verification cost is classical
+  simulation on both sides, so the analogy does not carry and Part VIII 6's framing is wrong
+  in kind. Cite it for the idea that verification can be cheaper than execution, not for the
+  construction.

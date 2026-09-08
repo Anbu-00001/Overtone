@@ -39,8 +39,13 @@ pub mod explore;
 pub mod graph;
 pub mod lmdp;
 pub mod options;
+pub mod rings;
 
 pub use evolve::{mean_distance, Eigenbasis};
 pub use graph::Graph;
 pub use lmdp::{compose, shortest_path_window, Lmdp, Solution};
 pub use options::{eigenoption, eigenoptions, Eigenoption, Laplacian};
+pub use rings::{
+    a000975, branching_factor, gray, gray_path, pauli_hypercube, rings_graph, solution_length,
+    ungray, PROVENANCE,
+};

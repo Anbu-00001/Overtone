@@ -178,6 +178,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
+name = "overtone-cgt"
+version = "0.1.0"
+
+[[package]]
 name = "overtone-cli"
 version = "0.1.0"
 dependencies = [
@@ -240,11 +244,13 @@ dependencies = [
 name = "overtone-orbit"
 version = "0.1.0"
 dependencies = [
+ "overtone-cgt",
  "overtone-graph",
  "overtone-gsim",
  "overtone-lie",
  "overtone-mps",
  "overtone-sim",
+ "overtone-spec",
  "overtone-wfc",
  "rand",
  "rand_chacha",

@@ -21,13 +21,16 @@
 
 #![forbid(unsafe_code)]
 
+pub mod advantage;
 pub mod checkmate;
 pub mod dial;
 pub mod endgame;
 pub mod game;
 pub mod invariant;
 pub mod ladder;
+pub mod thermal;
 
+pub use advantage::{dnd_advantage, dnd_disadvantage, Advantage};
 pub use dial::Complexity;
 pub use endgame::{is_endgame, Tablebase};
 pub use game::{legal_moves, Game, Move, Outcome, Piece, Player};
@@ -35,3 +38,6 @@ pub use invariant::{
     commutant_basis, orbit_dimension, separation_deficit, Invariants, OrbitCertificate,
 };
 pub use ladder::{Ladder, Strategy, LANGUAGE, STEP_UNIT};
+pub use thermal::{
+    ambient_temperature, interaction_leak, regions, temperature_field, Reading, Region, Trace,
+};

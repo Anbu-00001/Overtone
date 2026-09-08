@@ -1,7 +1,7 @@
 # OVERTONE — phase plan
 
-The specs define milestones M0–M45 across nine documents: Parts I–VIII plus the Part VI-A
-traps addendum. This file groups them into eleven executable phases with explicit entry and
+The specs define milestones M0–M52 across ten documents: Parts I–IX plus the Part VI-A
+traps addendum. This file groups them into twelve executable phases with explicit entry and
 exit criteria. A phase is done when its exit criteria are green in CI, not when its code is
 written.
 
@@ -26,6 +26,14 @@ Phase 10 does not start on a flat ladder.
 Fourth constraint, from **Part VIII §0**: the competition layer is a **notation, not a
 server**. Chess became a global competitive game three centuries before servers existed, and
 it scaled through a file format. Tier 3 — an actual server — is a standing no.
+
+Fifth constraint, from **Part IX §8**: **do not add a die.** Randomness decouples decision
+quality from outcome and lowers `d` — Snakes and Ladders is the canonical minimum in Lantz et
+al. for exactly that reason. Overtone is already a dice game and has been since M1: you build
+the distribution, then collapse it. Two corollaries with the same status. **Do not expand the
+generator hand** — Go has one piece type and 10^170 positions, so richness belongs in the
+substrate. **Do not hand-tune an evaluation function** — temperature (Phase 12) exists
+precisely so that never has to happen, and a tuned eval would be the first invented number.
 
 ---
 
@@ -892,8 +900,27 @@ so M19 lands here if it has not landed sooner.
 This is the reason the league belongs in the project at all. A population of
 externally-designed agents is a better `d` measurement than self-play: self-play measures how
 well the game resists one optimiser, a league measures how well it resists many independent
-minds, which is what Lantz's definition actually asks for. **Call it the ladder, not the
-leaderboard**, consistently.
+minds. **Call it the ladder, not the leaderboard**, consistently.
+
+**But the quoted sentence is not Lantz's definition, and M44 must not report the league's Elo
+range as `d`.** Lantz et al. draw exactly this distinction and come down the other way. A
+*skill chain* is "a sequence of human players of ascending skill"; a *strategy ladder* is "a
+sequence of algorithms called strategies" ordered by **CR-levels**, the computational
+resources each needs to run — and the paper gives four reasons for studying algorithms rather
+than players, including that "the distribution of possible strategies is likely different than
+those used by human players influenced by community, opponents, and conventions." It also
+requires that "one must first specify a language in which each of these algorithms is
+expressed", because "any observations made about a game's depth based on this model must refer
+to the language selected." A population of independently-designed submitted agents has no
+single language and no resource axis, so its Elo range is the skill-chain shape, not `d`.
+
+There is a second reason to distrust win rate here specifically. The paper warns that "games
+with random elements have a looser correlation between strategic decisions and game outcome,
+which can obfuscate the signal win rate gives us about strategic strength" — and Overtone has
+the Born rule. Phase 9's `d = 6` is already measured this way. The paper's own preferred
+alternative is quality-of-move against optimal play, which Overtone can actually compute:
+M36's endgame tablebase is exact. **M44 reports two numbers: the league's Elo spread, labelled
+as a skill chain, and `d` measured the way Phase 9 measures it, against a declared language.**
 
 **The complexity dial controls verifiability too**, which is the genuinely novel part:
 
@@ -917,6 +944,182 @@ VIII §11 says build it only if Tier 0 or Tier 1 produces people asking for it: 
 the most fun to build and the least likely to be needed. **Tier 3, an actual server, is a
 no.** It means uptime, cost, auth, abuse, moderation, and a single point of failure for a
 project whose most valuable property is that it always works.
+
+---
+
+## Phase 12 — Thermograph: move ordering nobody tuned  *(M46–M52)*  — DONE except the two gated panels
+
+**Spec:** Part IX. **Entry:** Phase 9's `overtone-orbit`, for the positions temperature is
+measured on. **Exit:** eight gate lines, below.
+
+Part IX arrived as three separate claims and they did not survive equally. The dice idea was
+already refuted in the document itself; the Chinese-rings instinct produced the project's
+sharpest counterexample; and the move-generation question turned out to have a real answer in
+combinatorial game theory. What follows is what was built and what the measurements changed.
+
+**M48 — temperature.** New crate `overtone-cgt`: short games, thermography from scratch, the
+temperature at the base of the mast, and decomposition search over disjunctive sums.
+
+Part IX §7 sets the acceptance test as "reproduce a worked Go endgame temperature from
+Berlekamp & Wolfe as a unit test", and §8 makes it a trap: if it cannot, the heat map is
+decoration. The family used is the **closed empty corridor**, whose analysis Berlekamp & Wolfe
+state as a recursion with no board in it:
+
+```
+Corr(0) = 0,   Corr(n+1) = { n | Corr(n) },   f(Corr(n)) = n - 2 + (1/2)^(n-1)
+```
+
+`f` is chilling by one, and a chilled corridor is a number, so the published `f` is the mean
+value — which the crate computes independently from the walls. It matches for `n = 1..20`
+under `assert_eq!` on `f64`, **with no tolerance**: every quantity in temperature theory is a
+dyadic rational, and dyadic rationals below `2^52` are exact in binary floating point. The
+temperature that falls out alongside it is `1 - (1/2)^(n-1)`, below 1 for every `n`, which is
+why chilling by one lands the corridor on a number at all.
+
+**The correction: CGT is defined for games of no chance.** Part IX §5 was written as though
+thermography applied to Overtone directly. Berlekamp's own survey opens: *"In its broadest
+sense, Combinatorial Game Theory (CGT) is the study of two-person, perfect information games
+of no chance."* Overtone has chance — rule 3 lets a player measure, and the Born rule is a
+chance node. So temperature is defined on the **coherent segment**, the run of unitary turns
+between one measurement and the next, and is undefined across a collapse. That is not a
+workaround; it is the honest domain of the tool, and it is the interval a player is actually
+reasoning about when deciding where to move.
+
+**The second correction: "optimal play is to move in the hottest region" is false.** Part IX
+§5.1 states it as a theorem. An exhaustive search over disjunctive sums finds a two-component
+counterexample with **distinct** temperatures — so it is not a gap about ties:
+
+```
+{0 | -3}  +  {{1 | -2} | -3}      Left to move
+temperatures 1.5 and 1.0, hottest is the first
+optimal stop -2, hottest-first -3, loss 1 point
+```
+
+The mechanism is visible in the position: the colder component's *left option* is a switch of
+temperature 1.5, hotter than the component itself. Greedy ordering assumes the heat it can see
+is all the heat there is. The rule is not worthless — on sums of plain switches the search
+finds no disagreement at all, which is the case the theory actually covers — so what Overtone
+gets from §5.2 is a derived move *ordering*, not a proof of optimality, and the docs say so.
+
+Two filters were needed before that result was real, and both came from wrong answers. The
+first search returned `{{-1|-2} | 1}`, which **is a number** by the simplicity rule, because
+every left option is strictly below every right option even though no option list is
+all-numeric; the crate reports a meaningless temperature for those by design. `Game::is_hot`
+is the soundness predicate that fixed it, and `Game::new` now panics on the all-numeric case.
+The second filter is distinct temperatures, since the rule says nothing about ties.
+
+**M47 — the Chinese Rings figure.** `overtone-graph::rings`. The state graph is built from the
+puzzle's two move rules and everything else is measured off it: it is a path on `2^n` vertices
+with exactly two endpoints and no vertex of degree above 2; the Gray code `G(i) = i XOR (i>>1)`
+orders it; and the distance from all-on to all-off is `A000975` — 1, 2, 5, 10, 21, 42, 85, …
+— recovered three ways, from the closed form, from BFS on the graph, and as the Gray index of
+the all-on state.
+
+```
+substrate               states   branching   diameter
+4x4 maze                    16       3.000          6
+7 rings                    128       1.984        127
+Pauli hypercube q=3         64       6.000          6
+```
+
+That is the figure. **Difficulty does not come from the number of options.** A seven-ring
+puzzle branches 1.98 ways and still takes 85 moves; a 4×4 maze branches 3 ways and is six deep.
+
+Two things Part IX §3 gets wrong and the module records instead. The puzzle is **not** two
+thousand years old: the Zhuge Liang attribution traces to Stewart Culin relying on an unnamed
+informant, and the earliest definitive references are Yang Shen's *Sheng an ji* (early 16th c.)
+and Pacioli's *De Viribus Quantitatis* (1509), with Cardano's *De subtilitate* (1550) giving
+it the name "Cardan's rings". So it is also not "older than algebra" — it postdates
+al-Khwarizmi by seven centuries. The argument does not need the date. Separately, the solution
+does **not** traverse the whole path: it is about two-thirds of it, converging to exactly 2/3,
+because the solved state is not at the far end.
+
+**M52 — the Pauli-string substrate.** `pauli_hypercube(q)`: cells are Pauli strings on `q`
+qubits, legal moves flip one generator, order `4^q`, `2q`-regular, diameter `2q`, and a Gray
+code still walks it — now as one Hamiltonian path among many rather than the only route.
+Part IX §3.1's observation that Part III has been carrying a hypercube around without walking
+on it, made concrete.
+
+**M50 — advantage.** `overtone-orbit::advantage`. Grover iterations as a player-facing dial:
+the simulator matches `sin^2((2k+1) theta)` to `1e-9` at every setting from 3 to 9 qubits
+without being told the formula, and the simulated argmax lands exactly on the predicted
+`round(pi/(4 theta) - 1/2)`.
+
+The comparison with D&D is quantified rather than asserted. One Grover iteration multiplies a
+long shot's probability by about **nine**; advantage — roll two dice, take the better —
+multiplies it by about **two**, so the equivalent setting of the dial is `k = 1` across the
+whole range tested. At its optimum the dial reaches `> 0.999` where advantage from the same
+base reaches `0.002`.
+
+And the asymmetry that matters: **a die has a floor and the dial does not.** Disadvantage can
+do no worse than squaring the probability. Over-rotation drops below the un-amplified base
+rate within one turn past the optimum, and keeping the dial turning falls below what a
+disadvantaged die could ever reach. How far you must turn is erratic — between 1 and 62 turns
+across 4 to 14 qubits — because it asks how well odd multiples of `theta` approximate multiples
+of `pi`, which is an equidistribution question and not a monotone function of register size.
+Part VI-A §T1's soufflé, with a number on it.
+
+**M51 — two temperatures.** `overtone-orbit::thermal`. Both quantities are derived, not
+invented: a region's CGT temperature is `(a - b)/2` where `a` and `b` are the game's **own**
+score — Part VII's `opponent absorbed weight minus own absorbed weight` — after the best move
+confined to that region by each side; the physical quantity is the half-chain von Neumann
+entropy from `overtone-spec`.
+
+**The first answer was wrong and the correction is the result.** Eight seeds gave a mean rank
+correlation of 0.49 with the same sign every time, which looks like a finding. It is not. Both
+series climb over the course of a game — temperature against ply at rho 0.76, entropy against
+ply at 0.46 — so the correlation between them is mostly a correlation with time. With the ply
+partialled out and the seed count doubled:
+
+```
+raw rho        mean  0.344   range [-0.089, 0.813]   sign not consistent
+partial rho    mean -0.021   range [-0.558,  0.500]  sign mixed 8/15
+```
+
+**They share a name. They do not share a behaviour.** Part IX §8's trap said to measure it and
+report what is found rather than assume; this is what was found. The panel in §5.4 is worth
+building for exactly that reason — a null result about a metaphor is still the project's
+characteristic move — but it must be labelled as one.
+
+A second measurement went the other way and supports the spec. Part IX §5.3 assumes the
+position splits into weakly-interacting regions; the **interaction leak** — the gap between
+the best move over the whole position and the best found one region at a time — is `0.0000`
+across every seed tested. Decomposition is exact here, not merely adequate.
+
+**M49 — the heat map.** Gated with Phase 10, but its risky half is measured now. Part IX §7
+sets the bar at "temperature updates live at 60fps on a 32×32 window", and a thousand
+thermographs turn out to cost **5.6% of a 60fps frame** at the depth that matters (the depth
+where hottest-first fails, so the depth the panel has to afford). Thermography is not the
+bottleneck and M49 does not depend on making it faster. The budget is spent building each
+region's game, which in Overtone means evaluating positions, and one `Position::new` closes an
+algebra: 16.3 µs per cell is the number to beat, or the field must be cached and updated
+incrementally the way a Zobrist-hashed transposition table updates a chess evaluation.
+
+**M46 — the measurement beat — is gated with Phase 10, and this is not a scope cut.** It is an
+interface change to a game that has no board yet: Phase 10 is still blocked on "still rising at
+the top of the ladder", and the JS budget stands at 1186 of 1200 lines with CLAUDE.md's
+standing instruction to move code into Rust rather than raise it. Building the beat now would
+mean building the board now, which is the thing Part VII §12 and this file's third governing
+constraint exist to prevent. The physics it renders is already there and has been since M1.
+
+### Exit criteria — met
+
+- `corridor reproduces Berlekamp & Wolfe` — 4 tests, exact `f64` equality, `n = 1..20`
+- `hottest-first is not optimal` — a 1-point loss at distinct temperatures
+- `hottest-first IS optimal on plain switches` — the boundary of the rule, both sides of it
+- `32x32 temperature field fits a frame` — 5.6% of 16.7 ms
+- `seven rings: branching 2, 85 moves`
+- `rings state graph is a path` — 128 states, 127 edges, 2 endpoints, 85 moves
+- `two temperatures do not track each other` — partial rho -0.021, sign mixed
+- `decomposition does not leak` — 0.0000
+
+### Deferred from Part IX, deliberately
+
+- **M46** and **M49**'s rendering: gated with Phase 10, above.
+- **Zobrist hashing** (§6). The observation is right — a Pauli bitboard and a Zobrist key are
+  the same XOR one level apart — but nothing in the workspace is yet slow because of repeated
+  position evaluation. It becomes real work the moment M49's per-cell budget binds, and the
+  measurement above says exactly when that is.
 
 ---
 

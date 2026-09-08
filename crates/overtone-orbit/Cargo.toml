@@ -14,5 +14,7 @@ overtone-gsim.workspace = true
 overtone-mps.workspace = true
 overtone-graph.workspace = true
 overtone-wfc.workspace = true
+overtone-spec.workspace = true
+overtone-cgt.workspace = true
 rand.workspace = true
 rand_chacha.workspace = true

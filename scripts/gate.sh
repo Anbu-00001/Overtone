@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The gate. Every claim in the README has a line here that fails when it stops being true.
 #
-# Run from the repository root. Phases 1-9.
+# Run from the repository root. Phases 1-12.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
@@ -33,14 +33,14 @@ expect() {
   fi
 }
 
-echo "PHASE 1-9 GATE"
+echo "PHASE 1-12 GATE"
 
 run "cargo fmt --check"                cargo fmt --all -- --check
 run "clippy -D warnings"               cargo clippy --workspace --all-targets -- -D warnings
 run "clippy (parallel)"                cargo clippy -p overtone-sim --features parallel --all-targets -- -D warnings
 run "cargo test --workspace"           cargo test --workspace
 run "cargo test (parallel)"            cargo test -p overtone-sim --features parallel
-for c in sim rl spec lie gsim walk wfc qd graph opt orbit; do
+for c in sim rl spec lie gsim walk wfc qd graph opt orbit cgt; do
   run "overtone-$c -> wasm32"          cargo build -p "overtone-$c" --target wasm32-unknown-unknown
 done
 run "wasm-pack build"                  wasm-pack build crates/overtone-wasm --target web --out-dir pkg --release
@@ -183,6 +183,39 @@ if command -v julia >/dev/null 2>&1; then
 else
   printf '  %-42s SKIP (julia not installed)\n' "Yao.jl oracle"
 fi
+
+# Phase 12 acceptance. Part IX.
+expect "corridor reproduces Berlekamp & Wolfe" \
+  'test result: ok\. 4 passed' \
+  cargo test --release -q -p overtone-cgt --test corridor
+
+expect "hottest-first is not optimal" \
+  'loss +1\.0000 points' \
+  cargo run --release -q -p overtone-cgt --example hottest
+
+expect "hottest-first IS optimal on plain switches" \
+  'hottest-first was optimal every time' \
+  cargo run --release -q -p overtone-cgt --example hottest
+
+expect "32x32 temperature field fits a frame" \
+  'VERDICT frame-budget-ok' \
+  cargo run --release -q -p overtone-cgt --example heatmap
+
+expect "seven rings: branching 2, 85 moves" \
+  'seven rings: branching 2\.0, and still 85 moves' \
+  cargo run --release -q -p overtone-graph --example rings
+
+expect "rings state graph is a path" \
+  '^ +7 +128 +127 +2 +85' \
+  cargo run --release -q -p overtone-graph --example rings
+
+expect "two temperatures do not track each other" \
+  'VERDICT no-correlation' \
+  cargo run --release -q -p overtone-orbit --example twotemps
+
+expect "decomposition does not leak" \
+  'mean interaction leak .*: 0\.0000' \
+  cargo run --release -q -p overtone-orbit --example twotemps
 
 echo
 echo "  passed=$passed failed=$failed"

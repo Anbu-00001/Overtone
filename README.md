@@ -293,10 +293,24 @@ property of the state. WFC has no phase, so nothing in it can ever interfere.
 | The endgame tablebase matches brute force | every cell, 3 mazes | exact | `overtone-orbit/tests/endgame.rs` |
 | The endgame solves inside 100 ms | 16x12 maze | `100 ms` | `overtone-orbit/tests/endgame.rs` |
 | The dial moves from evaluable to hard | both ends | exact | `overtone-orbit/tests/dial.rs` |
+| Corridor means match Berlekamp & Wolfe | `n = 1..20` | exact `f64` | `overtone-cgt/tests/corridor.rs` |
+| Corridor temperature is `1 - 2^(1-n)` | `n = 1..20` | exact `f64` | `overtone-cgt/tests/corridor.rs` |
+| Hottest-first is not optimal play | 1 point lost | distinct temps | `overtone-cgt/tests/decompose.rs` |
+| ...but it is exact on sums of switches | no disagreement | exhaustive | `overtone-cgt/tests/decompose.rs` |
+| The rings state graph is a path | `n = 1..12` | 2 endpoints | `overtone-graph/tests/rings.rs` |
+| Rings solution length is A000975 | 85 at `n = 7` | exact | `overtone-graph/tests/rings.rs` |
+| Branching 2 and still 85 moves | `1.984` | measured | `overtone-graph/tests/rings.rs` |
+| Grover matches `sin^2((2k+1)t)` | 3-9 qubits | `1e-9` | `overtone-orbit/tests/advantage.rs` |
+| The souffle point is where predicted | argmax | exact | `overtone-orbit/tests/advantage.rs` |
+| Over-rotation falls below a die's floor | 4-14 qubits | every one | `overtone-orbit/tests/advantage.rs` |
+| Region decomposition does not leak | 8 seeds | `0.0000` | `overtone-orbit/tests/thermal.rs` |
+| The two temperatures do not track | partial `rho = -0.021` | `< 0.25` | `overtone-orbit/examples/twotemps.rs` |
+| A 32x32 temperature field fits a frame | `5.6%` of 16.7 ms | `< 100%` | `overtone-cgt/examples/heatmap.rs` |
 | JavaScript stays a renderer | 1186 lines | 1200 | `scripts/check_js_budget.sh` |
 
-84 tests. Every number in the measured column is produced by the suite, and is the worst
-case across the full sweep rather than a typical value.
+206 integration tests, 249 with unit and doc tests. Every number in the measured column is
+produced by the suite, and is the worst case across the full sweep rather than a typical
+value.
 
 ## The dequantization test, run on ourselves
 
@@ -601,6 +615,101 @@ The conclusion is not that `dim(g)` fails to predict trainability — it is that
 environment cannot test the claim, and a term nobody can validate should not carry a weight.
 
 
+
+## Temperature, and the two sentences that did not survive being tested
+
+Part VII forbids invented numbers, which leaves a hole: a game needs move ordering, and the
+usual answer is a hand-tuned evaluation function — the invented number the rules prohibit.
+Combinatorial game theory fills it with a derived quantity. A position decomposes into
+independent regions, each region has a **temperature** computed by thermography, and the
+temperature is a property of the position rather than a weight somebody chose.
+
+The implementation is pinned to a published Go endgame, because Part IX §8 says that if it
+cannot reproduce one, the heat map is decoration. Berlekamp & Wolfe analyse the closed empty
+corridor as a recursion with no board in it — `Corr(0) = 0`, `Corr(n+1) = {n | Corr(n)}` —
+and publish `f(Corr(n)) = n - 2 + (1/2)^(n-1)` for the chilled value. Thermography computes
+the mean independently, from the walls, and the two agree for `n = 1..20` under `assert_eq!`
+on `f64` with **no tolerance at all**: every quantity in temperature theory is a dyadic
+rational, and dyadic rationals below `2^52` are exact in binary floating point.
+
+Two sentences in the spec did not survive.
+
+**"Optimal play is to move in the hottest region" is false.** An exhaustive search over
+disjunctive sums finds a counterexample with two components and distinct temperatures, so it
+is not a gap about ties:
+
+```
+{0 | -3}  +  {{1 | -2} | -3}          Left to move
+temperature 1.5      temperature 1.0
+optimal stop -2,  hottest-first -3,  loss 1 point
+```
+
+The colder component's *left option* is a switch of temperature 1.5 — hotter than the
+component containing it. Greedy ordering assumes the heat it can see is all the heat there
+is. The rule is not worthless: on sums of plain switches the same search finds no
+disagreement anywhere, which is exactly the case the theory covers. So temperature gives
+Overtone a derived move *ordering*, and not a proof of optimality.
+
+Getting there required two filters, both added because the search first returned nonsense.
+It offered `{{-1|-2} | 1}`, which **is a number** by the simplicity rule — every left option
+is strictly below every right option — even though no option list is all-numeric. A game that
+is hot all the way down cannot be a number, and that predicate is what made the result real.
+
+**And CGT temperature does not apply to Overtone as stated.** Berlekamp's own survey opens:
+*"In its broadest sense, Combinatorial Game Theory (CGT) is the study of two-person, perfect
+information games of no chance."* Overtone has chance — a player may measure, and the Born
+rule is a chance node. Temperature is therefore defined on the **coherent segment**, the run
+of unitary turns between one measurement and the next, and is undefined across a collapse.
+That is the honest domain of the tool rather than a workaround, and it happens to be the
+interval a player is reasoning about when deciding where to move.
+
+### Two temperatures, and a confound that ate the result
+
+Combinatorial game theory borrowed "temperature" from thermodynamics as a metaphor. Overtone
+has actual thermodynamics. Do the two track each other? Nobody has asked, because no game has
+ever had both.
+
+Eight seeds said yes: mean rank correlation `0.49`, the same sign every time. That was wrong.
+Both series climb over the course of a game — temperature against ply at `rho = 0.76`,
+entropy against ply at `0.46` — so a correlation between them is mostly a correlation with
+time. Doubling the seeds and partialling out the ply:
+
+```
+raw rho        mean  0.344    range [-0.089, 0.813]    sign not consistent
+partial rho    mean -0.021    range [-0.558,  0.500]   sign mixed, 8 of 15
+```
+
+They share a name. They do not share a behaviour. A measurement in the other direction went
+the spec's way: the **interaction leak**, the gap between the best move over the whole
+position and the best found one region at a time, is `0.0000` on every seed. The
+decomposition Part IX §5.3 assumes is not merely adequate here, it is exact.
+
+### The oldest counterexample in the project
+
+The Chinese Rings has a state graph that is a **path** — not a tree, a line — on `2^n`
+vertices, ordered by the Gray code `G(i) = i XOR (i>>1)`, with the solved state at distance
+`A000975(n)`. Built here from the puzzle's two move rules, with everything else measured off
+it rather than asserted:
+
+```
+substrate               states   branching   diameter
+4x4 maze                    16       3.000          6
+7 rings                    128       1.984        127
+Pauli hypercube q=3         64       6.000          6
+```
+
+Seven rings offer 1.98 moves per state and still take 85 of them. A 4x4 maze offers three and
+is six deep. **Difficulty does not come from the number of options — it comes from the
+difficulty of knowing which option is forward.**
+
+The puzzle is not, however, two thousand years old. The attribution to Zhuge Liang traces to
+Stewart Culin relying on an unnamed informant; the earliest definitive references are Yang
+Shen's *Sheng an ji* (early 16th century) and Pacioli's *De Viribus Quantitatis* (1509), with
+Cardano's *De subtilitate* (1550) giving it the name "Cardan's rings". It postdates
+al-Khwarizmi by seven centuries, so it is not older than algebra either. The argument survives
+the correction intact.
+
+
 ## Why three gradient checks and not one
 
 The adjoint path is what training uses: constant memory in circuit depth, every parameter in
@@ -661,7 +770,7 @@ instruction to solve it numerically is well taken.
 ## Building
 
 ```
-cargo test --workspace                          # 84 tests
+cargo test --workspace                          # 249 tests
 cargo test -p overtone-sim --features parallel  # plus the threaded kernels
 cargo clippy --workspace --all-targets -- -D warnings
 cargo build -p overtone-sim --target wasm32-unknown-unknown
@@ -691,10 +800,11 @@ crates/overtone-qd/     MAP-Elites: the Menagerie archive             (Phase 7)
 crates/overtone-graph/  maze Laplacian, eigenbasis, LMDP, eigenoptions (Phase 8)
 crates/overtone-opt/    shot budgets, four optimisers, the flatline   (Phase 8)
 crates/overtone-orbit/  Orbit: checkmate, the ladder, the endgame      (Phase 9)
+crates/overtone-cgt/    thermography, temperature, decomposition     (Phase 12)
 crates/overtone-cli/    native trainer, predict, dequantize
 crates/overtone-wasm/   wasm-bindgen surface                       (Phase 4)
 lab/                    Yao.jl oracle and heavy sweeps
-docs/spec/              the build specification, Parts I to VIII and VI-A
+docs/spec/              the build specification, Parts I to IX and VI-A
 ```
 
 The dependency direction is one-way and load-bearing. `overtone-sim` knows nothing about

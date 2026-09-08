@@ -138,7 +138,13 @@ pub fn play(
 }
 
 /// The starting position: both players spread over the window, with disjoint hands.
-fn opening(n: usize, coherence: usize, k: usize, rng: &mut ChaCha8Rng) -> Game {
+/// The starting position: two players at opposite corners of the window, one holding every
+/// single-qubit X and the other every single-qubit Z.
+///
+/// Public because M51 measures temperature along a trajectory and has to start it from the
+/// same place the ladder does; a second opening would make the two measurements
+/// incomparable.
+pub fn opening(n: usize, coherence: usize, k: usize, rng: &mut ChaCha8Rng) -> Game {
     let dim = 1usize << n;
     let make = |start: usize| {
         let mut re = vec![0.0; dim];
