@@ -20,10 +20,12 @@ polynomial, and a polynomial `dim(g)` is exactly the condition for having no bar
 The circuits that train are the circuits that are classically simulable. That tension is the
 live question in the field, and this repository names it rather than routing around it.
 
-**Status: Phase 8 of 11, partial.** The simulator, both gradient paths, the RL loop, the LP ceiling,
-the spectral instrument, the browser demo, the closure engine, g-sim, the dequantization
-test, the substrate worlds and the transport instrument are built and verified — 31 gates,
-green. Phase 5, the lattice, is **partial**: Part IV's worlds cannot be measured without a
+**Status: Phase 8 of 11, complete.** The simulator, both gradient paths, the RL loop, the LP
+ceiling, the spectral instrument, the browser demo, the closure engine, g-sim, the
+dequantization test, the substrate worlds, the transport instrument, the maze eigenbasis, the
+linearly-solvable MDP, the optimiser flatline, the quantile critic and shot dial, eigenoptions
+with Go-Explore, and architecture search with its verification are built and verified — 48
+gates, green. Phase 5, the lattice, is **partial**: Part IV's worlds cannot be measured without a
 walk, so the one-dimensional core of Part II's M6 and M7 was built early, and what remains
 is everything two-dimensional. See [docs/PHASES.md](docs/PHASES.md) for the plan and
 [docs/spec/](docs/spec/) for the full build specification, Parts I to VIII plus the VI-A
@@ -76,11 +78,18 @@ mkdir -p web/pkg && cp crates/overtone-wasm/pkg/overtone_wasm{.js,_bg.wasm} web/
 cd web && python3 -m http.server 8731
 ```
 
-The JavaScript is a renderer and nothing else: **1014 lines of 1200**, enforced in CI. Every
+The page carries four sections: `Lab` (Part I), `Closure` (Part III), the Menagerie
+(Part IV) and `Lattice` (Part V). The last of those draws proto-value function `k` over a
+maze the reader watched collapse, toggles the exponent between real and imaginary with the
+mean-spread readout beside it, and composes two solved control tasks with a slider that
+prints its own error against solving the third from scratch.
+
+The JavaScript is a renderer and nothing else: **1186 lines of 1200**, enforced in CI. Every
 quantity a panel needs arrives from Rust already normalised and ordered, so the renderer
 draws and never computes. The budget was 800 in Part I, written when the page was one
-section; it was raised once, deliberately, when the page reached three. The rule it enforces
-is unchanged, and if it binds again the fix is to move code into Rust rather than raise it. Deployment is a Hugging Face **Static Space**, which is free for
+section; it was raised once, deliberately, when the page reached three, and has not been
+raised since. The rule it enforces is unchanged, and now that it binds the fix is to move
+code into Rust rather than raise it again. Deployment is a Hugging Face **Static Space**, which is free for
 everyone — Gradio and Docker Spaces run on compute and require a paid plan. That was
 re-verified against Hugging Face's own documentation on 2026-09-06 and is quoted in
 `scripts/deploy_space.sh`; it has changed before, so it is a release-checklist item rather
@@ -257,7 +266,23 @@ property of the state. WFC has no phase, so nothing in it can ever interfere.
 | The LMDP error falls as `1/rho` in log space | `0.634 → 0.0063` | ratio 8–12 | `overtone-graph/tests/eigenbasis.rs` |
 | Native and wasm32 trajectories agree | `5.55e-16` | `1e-13` | `scripts/wasm_determinism.sh` |
 | The page boots and reads from the engine | headless Chrome | — | `.github/workflows/ci.yml` |
-| JavaScript stays a renderer | 762 lines | 800 | `scripts/check_js_budget.sh` |
+| All four optimisers reach a known minimum first | Rosenbrock `< 1e-4` | — | `overtone-opt/tests/optimisers.rs` |
+| The shot estimator is unbiased with the stated variance | within 10% | 10% | `overtone-opt/tests/flatline.rs` |
+| The metered gradient is the adjoint gradient | `< 1e-10` | `1e-10` | `overtone-opt/tests/flatline.rs` |
+| Exact arithmetic does *not* flatline in a plateau | descends at every `n` | — | `overtone-opt/tests/flatline.rs` |
+| Shots needed grow exponentially in `n` | `2^(0.60 n)` CMA-ES, `R²=0.973` | `R² > 0.8` | `overtone-opt/tests/flatline.rs` |
+| A quantile critic reaches its representation floor | `0.0179` vs `0.0174` | 15% | `overtone-rl/tests/distributional.rs` |
+| Huber `kappa = 1` fits an expectile, not a quantile | `0.328` vs `0.0179` | 10× | `overtone-rl/tests/distributional.rs` |
+| Shots do not narrow the return distribution | flat at `0.68` | `0.02` | `overtone-rl/tests/distributional.rs` |
+| The score-function bias falls with the shot budget | `0.052 → 0.00008` | 20× | `overtone-rl/tests/distributional.rs` |
+| The two Laplacians coincide only on a regular graph | `2e-16` vs `> 0.1` | — | `overtone-graph/tests/options.rs` |
+| Every eigenoption terminates somewhere | Theorem 3.1 | exact | `overtone-graph/tests/options.rs` |
+| Go-Explore's archived route is near-optimal | within 4 hops | 4 hops | `overtone-graph/tests/options.rs` |
+| Loop erasure yields a simple path on real edges | every vertex once | exact | `overtone-graph/tests/options.rs` |
+| The reach term predicts the trained return | `rho = 0.62` | `> 0.4` | `overtone-qd/tests/architecture.rs` |
+| The gate-count penalty has the wrong sign | `rho = -0.49` | `< -0.2` | `overtone-qd/tests/architecture.rs` |
+| The combined reward loses to its own reach term | `0.60` vs `0.35` | — | `overtone-qd/tests/architecture.rs` |
+| JavaScript stays a renderer | 1186 lines | 1200 | `scripts/check_js_budget.sh` |
 
 84 tests. Every number in the measured column is produced by the suite, and is the worst
 case across the full sweep rather than a typical value.
@@ -322,7 +347,7 @@ verdict: dim(g) = 12 of 255 for the trainable generators, but this circuit's fix
          entanglers put it outside exp(g). No trainability claim follows. Measure it.
 ```
 
-## Twelve things the specification did not say, that turned out to matter
+## Twenty things the specification did not say, that turned out to matter
 
 **The frequency ceiling counts encoding gates, not layers.** Part I states the reachable
 spectrum as `{-L..L}` for `L` layers. That holds only when each layer applies one encoding
@@ -466,6 +491,105 @@ reverses, and the honest result is a negative one: **conditioning pays only on t
 word.**
 
 
+**A barren-plateau demonstration written with exact expectation values shows the opposite of
+the paper it cites.** Part V asks for four optimisers racing deep in a plateau, all flat,
+citing Arrasmith et al. But their result is that the cost function *differences* are
+exponentially suppressed — the obstruction is measurement precision, not the shape of the
+landscape. Give an optimiser `f64` values from a state vector and it has sixteen digits,
+which dwarfs the `2^(-1.03 n)` differences at any width a browser can simulate. Measured:
+with exact arithmetic all four descend at every `n` from 2 to 10, on every seed, Nelder–Mead
+included. The demo needs a shot budget or it is a demo of the opposite claim.
+
+**And "all four flatline" is still too strong.** Shots per evaluation needed before an
+optimiser beats its own noise:
+
+```
+   n   params    gradient   natural gradient    CMA-ES   Nelder-Mead
+   2        8          16                 32        16           256
+   4       32          32                 32        32          4096
+   6       72         256                256        64          8192
+   8      128        4096               4096       128         65536
+  10      200       32768              16384       512       > 65536
+
+  fitted as shots ~ 2^(a n)
+   gradient  a = 1.450  R^2 = 0.969        CMA-ES  a = 0.600  R^2 = 0.973
+   natural   a = 1.250  R^2 = 0.936   Nelder-Mead  a = 1.250  R^2 = 0.954
+```
+
+Every exponent is positive, which is the paper's result. They are not the same exponent, and
+a population method — whose decision is a rank over `lambda` samples rather than a difference
+between two — survives about four times further in `n`. The slogan hides that.
+
+**Never score a noisy optimiser on the best value it saw.** It is a minimum over many draws,
+so it rewards whichever optimiser evaluated most, and rewards the noise. At `n = 4` with 100
+shots the natural-gradient lane believed it had reached `-0.52`; the exact cost where it
+actually stopped was `+0.25`, above where it started. Every lane here is scored on the exact
+cost at its final iterate, computed off the meter.
+
+**Shots do not sharpen a return distribution.** Part V asks to "sweep shots from 10 to 10,000
+and watch the return distribution sharpen". Two distributions are in play and only one depends
+on the shot count. The return distribution is aleatoric — on `SpectralControl` it is two atoms
+at `±cos(ks)` — and its spread is flat at `0.68` across three decades of shots. What sharpens
+is the *estimate*. What a shot budget really buys is the **score function**, which is
+nonlinear in the measured `z`, so a cheap measurement biases the gradient: `0.052` at 10
+shots, `0.0029` at 100, `0.0004` at 1000, `0.00008` at 10,000.
+
+**The published Huber `kappa = 1` fits an expectile, not a quantile, on returns of order
+one.** Dabney et al. chose it against Atari returns in the hundreds. Here every residual falls
+inside the Huber quadratic, so the subgradient is `u` rather than `sign(u)` and the fixed
+point moves. At `kappa = 1` the 1-Wasserstein distance to a known two-atom distribution stalls
+at `0.328` however many samples arrive; at `kappa = 0` it reaches `0.0179` against a
+representation floor of `0.0174`. Reading their eq. 9 literally at `kappa = 0` also gives no
+gradient at all, so that case is the plain quantile loss by their own `rho^0_tau = rho_tau`.
+
+**Machado et al. use two different Laplacians in two different sections.** §2.3 says "the
+normalized graph Laplacian, which we use in this paper"; §5's sample-based algorithm recovers
+the combinatorial one, since its incidence matrix satisfies `T^T T = 2(D − W)`. On a regular
+graph that is one diffusion model — `‖L/d − L_norm‖∞ = 2e-16` on a cycle — and on a maze it is
+two, at `0.80`, disagreeing on the chosen action at `0.594` of states. Neither is wrong;
+naming which one a call site means is the fix.
+
+**Do not compare eigenvector-derived quantities on a degenerate spectrum.** The first control
+for that claim was a 24-cycle, whose Laplacian eigenvalues come in pairs. Inside a degenerate
+eigenspace any rotation is a valid basis, so two solvers disagreed there by `0.79` for reasons
+that had nothing to do with the graph. The maze's low spectrum is simple to `3.8e-3`, which is
+what makes its disagreement real, and the matrix-level statement needs no such caveat at all.
+
+**Go-Explore does not beat an undirected walk at every size, and the crossover is the
+budget.** Loop-erasing both trajectories, so the comparison is between two post-processed
+answers rather than one: at 101 vertices they tie; at 962 the archive finds a distant goal
+21/21 against 12/21; at 2751 it finds it **2/21 against 8/21**. Give the same 2751-vertex maze
+four times the budget and it is 21/21 against 20/21. Return-then-explore spends its opening
+steps building an archive and only then aims. Part V's claim that it is "the right exploration
+algorithm for an endless maze" holds in a window, and the window is set by step count.
+
+**Part V's algebraic architecture reward is beaten by its own reach term.** The verification
+the spec itself demands, over 200 architectures each trained to convergence on the exact
+policy gradient:
+
+```
+  predictor                 Spearman rho
+  reach itself                    0.618
+  reach covers k                  0.581
+  -gate count                    -0.486     <- the wrong sign
+  dim(g) is polynomial           -0.060
+  untrained return                0.076
+```
+
+Gates track layers, layers track the frequency ceiling, so charging for gates charges for
+reach. Selecting the top twenty by the three-term reward is indistinguishable from random
+selection — five seeds above, five below — while selecting on reach alone beats random on all
+ten and beats the combined reward on nine. Adding two terms that carry no signal to one that
+does costs the whole of the signal.
+
+**And the `dim(g)` term cannot be validated on a problem small enough to validate it on.** It
+is a *trainability* proxy, and two to five qubits with an exact analytic gradient has no
+barren plateau to be saved from. That is the same reason the archive's fitness-by-`dim(g)`
+profile came out flat and the same reason the optimiser flatline needed shot noise to appear.
+The conclusion is not that `dim(g)` fails to predict trainability — it is that this
+environment cannot test the claim, and a term nobody can validate should not carry a weight.
+
+
 ## Why three gradient checks and not one
 
 The adjoint path is what training uses: constant memory in circuit depth, every parameter in
@@ -553,7 +677,8 @@ crates/overtone-mps/    bond spectra and the dequantization test    (Phase 6)
 crates/overtone-walk/   quantum walks, substrates, transport exponent (Phase 7)
 crates/overtone-wfc/    Wave Function Collapse, which is not physics (Phase 7)
 crates/overtone-qd/     MAP-Elites: the Menagerie archive             (Phase 7)
-crates/overtone-graph/  maze Laplacian, eigenbasis, LMDP              (Phase 8)
+crates/overtone-graph/  maze Laplacian, eigenbasis, LMDP, eigenoptions (Phase 8)
+crates/overtone-opt/    shot budgets, four optimisers, the flatline   (Phase 8)
 crates/overtone-cli/    native trainer, predict, dequantize
 crates/overtone-wasm/   wasm-bindgen surface                       (Phase 4)
 lab/                    Yao.jl oracle and heavy sweeps

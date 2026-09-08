@@ -12,11 +12,13 @@
 
 pub mod ansatz;
 pub mod ceiling;
+pub mod distributional;
 pub mod env;
 pub mod policy;
 pub mod reinforce;
 
 pub use ansatz::{Ansatz, AnsatzConfig, EncodingSite, Scaling, SpectralControlAnsatz};
+pub use distributional::{QuantileCritic, TwoAtoms};
 pub use env::SpectralControl;
 pub use policy::{Policy, PolicyKind};
 pub use reinforce::{train, TrainConfig, TrainOutcome};

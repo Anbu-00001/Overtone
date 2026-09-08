@@ -83,7 +83,8 @@ crates/
 ├── overtone-walk/   discrete-time quantum walks, substrates, the transport exponent
 ├── overtone-wfc/    Wave Function Collapse and its Shannon entropy (not physics)
 ├── overtone-qd/     MAP-Elites over policy agents: the Menagerie archive
-├── overtone-graph/  maze Laplacian, the shared eigenbasis, linearly-solvable MDPs
+├── overtone-graph/  maze Laplacian, shared eigenbasis, LMDPs, eigenoptions, Go-Explore
+├── overtone-opt/    shot budgets, four optimisers, the barren-plateau flatline
 ├── overtone-cli/    native trainer, `predict`, `dequantize`; emits JSONL traces
 └── overtone-wasm/   wasm-bindgen surface for the browser
 ```
@@ -103,6 +104,10 @@ Dependency direction is one-way and load-bearing:
   a measurement and every measurement it needs already exists below it.
 - `overtone-graph` depends on `mps` for the eigensolver and on `wfc` for a maze to put a
   Laplacian on. It is the one place a physics crate may import `wfc`, and only for its grid.
+- `overtone-opt` sits above `sim`, `spec` and `mps`. **Finite-shot measurement itself lives
+  in `overtone-sim`** (`measure.rs`), not here: it is a statement about a state vector and an
+  observable and about nothing else, and two unrelated consumers need it — the plateau race
+  of Part V §5.2 and the shot dial of Part V §4, which turn out to be one instrument.
 - `overtone-wasm` is a thin FFI shim. **If it contains an `if` statement about physics,
   that logic is in the wrong crate.**
 
@@ -250,3 +255,31 @@ Credibility is the scarce resource in this field.
   honest reason for the archive is diversity: at a matched budget it reached `J = 0.502`
   against a single-peak search's `0.403`, by holding structurally different agents. Say that
   instead.
+
+- **A barren-plateau demo with exact expectation values shows the opposite of the paper it
+  cites** (Part V §5.2). Arrasmith et al. suppress cost function *differences*, so the
+  obstruction is measurement precision. With `f64` values every optimiser gets sixteen digits
+  free and all four descend at every simulable `n`. The flatline needs `Budget::Shots`.
+- **"All four flatline" is too strong; the exponents differ.** Shots needed grows as
+  `2^(a n)` for all four, which is the paper's result, but `a` runs from `0.60` for CMA-ES to
+  `1.45` for the gradient. Quote the exponents with their `R²`, not the slogan.
+- **Never score a noisy optimiser on the best value it saw.** That is a minimum over draws:
+  it rewards evaluating more and rewards noise. Score on the exact cost where it stopped.
+- **Shots do not sharpen a return distribution** (Part V §4 says they do). The return
+  distribution is aleatoric. What shots buy is the score function, which is nonlinear in the
+  measured `z`, so a cheap measurement biases the gradient as `1/N`.
+- **Dabney et al.'s `kappa = 1` is not scale-free.** On returns of order one every residual
+  is inside the Huber quadratic and the fixed point is an expectile. Use `kappa` well below
+  the spread of the returns, and special-case `kappa = 0` to `sign(u)`.
+- **Machado et al. use the normalized Laplacian in §2.3 and recover the combinatorial one in
+  §5.** They coincide only on a regular graph, and a maze never is one. Name which one every
+  call site means; a default silently picks one of the paper's two answers.
+- **Do not compare eigenvector-derived quantities on a degenerate spectrum.** Inside a
+  degenerate eigenspace any rotation is a valid basis, so two solvers disagree for reasons
+  that are not about the graph. Check the gap first, or make the claim at the matrix level.
+- **Loop-erase both sides before comparing path lengths.** An archived route against a raw
+  wander measures which one was post-processed, not which method is better.
+- **Part V §3's algebraic reward is beaten by its own reach term.** The gate-count penalty
+  has the wrong sign — gates track layers, layers track the frequency ceiling — and the
+  `dim(g)` term carries no signal at widths where there is no plateau to be saved from.
+  Verified per term, as Part V §10 requires; do not restore the combined form.

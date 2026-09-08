@@ -35,9 +35,12 @@
 #![forbid(unsafe_code)]
 
 pub mod evolve;
+pub mod explore;
 pub mod graph;
 pub mod lmdp;
+pub mod options;
 
 pub use evolve::{mean_distance, Eigenbasis};
 pub use graph::Graph;
 pub use lmdp::{compose, shortest_path_window, Lmdp, Solution};
+pub use options::{eigenoption, eigenoptions, Eigenoption, Laplacian};

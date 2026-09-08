@@ -1024,3 +1024,270 @@ mod tests {
         );
     }
 }
+
+// ---------------------------------------------------------------------------------------
+// Part V: the Lattice tab.
+// ---------------------------------------------------------------------------------------
+
+/// M22 and M23 for the browser: one maze, one eigendecomposition, four fields.
+///
+/// Everything the panel draws is computed here. The page picks a mode, a time and two
+/// mixing weights; it never exponentiates a matrix, never solves an eigenproblem, and never
+/// decides what "reached the exit" means.
+///
+/// The eigensolve is the expensive step and it happens once, in [`Lattice::new`]. A maze of
+/// a hundred vertices is a hundred-by-hundred Jacobi sweep, which is milliseconds; the
+/// per-frame calls below are all `O(n^2)` recombinations of a basis that is already there.
+#[wasm_bindgen]
+pub struct Lattice {
+    graph: overtone_graph::Graph,
+    basis: overtone_graph::Eigenbasis,
+    coords: Vec<(usize, usize)>,
+    width: usize,
+    height: usize,
+    source: usize,
+    exits: [usize; 2],
+    z_a: Vec<f64>,
+    z_b: Vec<f64>,
+    rho: f64,
+}
+
+#[wasm_bindgen]
+impl Lattice {
+    /// Collapse a maze, take its largest component, and diagonalise its Laplacian.
+    ///
+    /// Both walks run under `L`. Part V 1.3 writes the toggle as `e^(-Lt)` against
+    /// `e^(-iAt)`, but those are two different operators and agree only on a regular graph;
+    /// a maze never is one. See `overtone_graph::evolve`.
+    #[wasm_bindgen(constructor)]
+    pub fn new(width: usize, height: usize, seed: u32) -> Lattice {
+        // `u32`, not `u64`, and the reason is not style. wasm-bindgen maps `u64` to a JS
+        // `BigInt`, so a page passing an ordinary Number throws a TypeError at the boundary
+        // -- and because this constructor runs during start-up, that exception took down the
+        // whole init chain, including the hero loop three panels away. Every other
+        // constructor in this file already takes `u32` and widens here.
+        let mut wfc = overtone_wfc::Wfc::new(width, height, seed as u64);
+        wfc.run();
+        let graph = overtone_graph::Graph::from_wfc(&wfc).largest_component();
+        let basis = overtone_graph::Eigenbasis::of_laplacian(&graph);
+        let coords = graph.coords().to_vec();
+        let n = graph.order();
+
+        // The source is a corner-most vertex and the two exits are the two vertices furthest
+        // from it and from each other, so that task A and task B are genuinely different
+        // tasks rather than two names for the same corner.
+        let source = (0..n)
+            .min_by_key(|&i| coords[i].0 + coords[i].1)
+            .unwrap_or(0);
+        let from_source = graph.bfs_distances(&[source]);
+        let first = (0..n)
+            .max_by_key(|&i| from_source[i].unwrap_or(0))
+            .unwrap_or(0);
+        let from_first = graph.bfs_distances(&[first]);
+        let second = (0..n)
+            .max_by_key(|&i| from_first[i].unwrap_or(0).min(from_source[i].unwrap_or(0)))
+            .unwrap_or(0);
+
+        let rho = overtone_graph::Lmdp::recommended_rho(&graph, &[first, second]);
+        let exits = [first, second];
+        let z_a =
+            overtone_graph::Lmdp::with_terminal_values(&graph, exits.to_vec(), vec![1.0, 0.0], rho)
+                .desirability(20_000, 1e-14)
+                .z;
+        let z_b =
+            overtone_graph::Lmdp::with_terminal_values(&graph, exits.to_vec(), vec![0.0, 1.0], rho)
+                .desirability(20_000, 1e-14)
+                .z;
+
+        Lattice {
+            graph,
+            basis,
+            coords,
+            width,
+            height,
+            source,
+            exits,
+            z_a,
+            z_b,
+            rho,
+        }
+    }
+
+    pub fn order(&self) -> usize {
+        self.graph.order()
+    }
+
+    pub fn diameter(&self) -> usize {
+        self.graph.diameter()
+    }
+
+    /// True when the two exponents of Part V 1.3 would be indistinguishable. A maze is
+    /// never regular, so this is how the panel says why it uses `L` on both sides.
+    pub fn is_regular(&self) -> bool {
+        self.graph.is_regular()
+    }
+
+    /// Grid coordinates of every vertex, flattened as `x0, y0, x1, y1, ...`.
+    pub fn coords(&self) -> Vec<f64> {
+        self.coords
+            .iter()
+            .flat_map(|&(x, y)| [x as f64, y as f64])
+            .collect()
+    }
+
+    /// Edges, flattened as `a0, b0, a1, b1, ...`, each listed once.
+    pub fn edges(&self) -> Vec<f64> {
+        let mut out = Vec::new();
+        for i in 0..self.graph.order() {
+            for &j in self.graph.neighbours(i) {
+                if i < j {
+                    out.push(i as f64);
+                    out.push(j as f64);
+                }
+            }
+        }
+        out
+    }
+
+    pub fn grid_width(&self) -> usize {
+        self.width
+    }
+
+    pub fn grid_height(&self) -> usize {
+        self.height
+    }
+
+    pub fn source(&self) -> usize {
+        self.source
+    }
+
+    pub fn exit_a(&self) -> usize {
+        self.exits[0]
+    }
+
+    pub fn exit_b(&self) -> usize {
+        self.exits[1]
+    }
+
+    pub fn eigenvalues(&self) -> Vec<f64> {
+        self.basis.values.clone()
+    }
+
+    /// Proto-value function `k`, normalised to `[-1, 1]` so the page maps it to colour
+    /// without deciding a scale of its own.
+    pub fn mode(&self, k: usize) -> Vec<f64> {
+        let v = self.basis.mode(k.min(self.graph.order() - 1));
+        let peak = v.iter().fold(0.0f64, |m, x| m.max(x.abs())).max(1e-12);
+        v.iter().map(|x| x / peak).collect()
+    }
+
+    /// `e^(-Lt)` from the source: diffusion. Normalised to its own peak.
+    pub fn diffuse(&self, t: f64) -> Vec<f64> {
+        Lattice::normalise(self.basis.diffuse(&self.impulse(), t))
+    }
+
+    /// `|e^(-iLt) psi|^2` from the source: interference. Same basis, same normalisation.
+    pub fn interfere(&self, t: f64) -> Vec<f64> {
+        Lattice::normalise(self.basis.interference_probability(&self.impulse(), t))
+    }
+
+    /// Mean hop distance from the source under each evolution, as `[classical, quantum]`.
+    ///
+    /// The honest caption for the toggle. The quantum field leads early and then stops
+    /// leading -- it is unitary on a finite graph, so the modes come back into phase and it
+    /// returns. The panel reads these numbers rather than asserting a winner.
+    pub fn spread(&self, t: f64) -> Vec<f64> {
+        let d = self.graph.bfs_distances(&[self.source]);
+        let p0 = self.impulse();
+        vec![
+            overtone_graph::mean_distance(&d, &self.basis.diffuse(&p0, t)),
+            overtone_graph::mean_distance(&d, &self.basis.interference_probability(&p0, t)),
+        ]
+    }
+
+    /// The time at which diffusion has effectively relaxed, `25 / lambda_1`.
+    ///
+    /// Set by the spectral gap rather than by a round number, so the slider's range is a
+    /// property of this maze and not of anyone's taste.
+    pub fn relaxation_time(&self) -> f64 {
+        let gap = self.basis.values.get(1).copied().unwrap_or(1.0).max(1e-9);
+        25.0 / gap
+    }
+
+    /// Log-spaced times from `0.1` to the relaxation time, for the toggle's slider.
+    ///
+    /// Linear would be useless: on this maze the spectral gap puts relaxation past `t = 3000`
+    /// while everything the panel is about -- the crossover where the quantum field passes
+    /// diffusion and falls behind again -- happens between `t = 2` and `t = 8`. A linear
+    /// slider would spend 99.8% of its travel on a settled field. The grid is computed here
+    /// so the page does not have to know that.
+    pub fn time_grid(&self, steps: usize) -> Vec<f64> {
+        let hi = self.relaxation_time().max(1.0);
+        let (lo, n) = (0.1f64, steps.max(2));
+        (0..n)
+            .map(|i| lo * (hi / lo).powf(i as f64 / (n - 1) as f64))
+            .collect()
+    }
+
+    /// The desirability field of the composed task `alpha z_A + beta z_B`, normalised.
+    ///
+    /// Not solved: *added*. The equation in `z` is linear, so a task nobody solved is the
+    /// sum of two that were. The panel's slider moves `alpha` and `beta` and nothing is
+    /// recomputed but a weighted sum.
+    pub fn composed(&self, alpha: f64, beta: f64) -> Vec<f64> {
+        Lattice::normalise(overtone_graph::compose(&self.z_a, &self.z_b, alpha, beta))
+    }
+
+    /// How far the composed field is from solving that task from scratch.
+    ///
+    /// The claim under the slider, computed rather than asserted. Solving it costs one power
+    /// iteration, which is why the panel can afford to check itself every time the slider
+    /// moves.
+    pub fn composition_error(&self, alpha: f64, beta: f64) -> f64 {
+        let solved = overtone_graph::Lmdp::with_terminal_values(
+            &self.graph,
+            self.exits.to_vec(),
+            vec![alpha, beta],
+            self.rho,
+        )
+        .desirability(20_000, 1e-14)
+        .z;
+        overtone_graph::compose(&self.z_a, &self.z_b, alpha, beta)
+            .iter()
+            .zip(&solved)
+            .map(|(x, y)| (x - y).abs())
+            .fold(0.0, f64::max)
+    }
+
+    /// The optimal next vertex from each state under the composed policy, or the state
+    /// itself at an exit.
+    pub fn policy(&self, alpha: f64, beta: f64) -> Vec<f64> {
+        let z = overtone_graph::compose(&self.z_a, &self.z_b, alpha, beta);
+        (0..self.graph.order())
+            .map(|i| {
+                self.graph
+                    .neighbours(i)
+                    .iter()
+                    .copied()
+                    .max_by(|&a, &b| z[a].partial_cmp(&z[b]).unwrap())
+                    .unwrap_or(i) as f64
+            })
+            .collect()
+    }
+
+    /// Hop distance from the source, for the caption that says how far the exits are.
+    pub fn distance_to(&self, vertex: usize) -> usize {
+        self.graph.bfs_distances(&[self.source])[vertex].unwrap_or(0)
+    }
+
+    fn impulse(&self) -> Vec<f64> {
+        let mut p = vec![0.0; self.graph.order()];
+        p[self.source] = 1.0;
+        p
+    }
+
+    fn normalise(v: Vec<f64>) -> Vec<f64> {
+        let peak = v.iter().fold(0.0f64, |m, x| m.max(x.abs())).max(1e-300);
+        v.iter().map(|x| x / peak).collect()
+    }
+}

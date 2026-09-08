@@ -22,7 +22,10 @@ expect() {
   local name="$1" pattern="$2"; shift 2
   local out
   out="$("$@" 2>&1)"
-  if grep -qE "$pattern" <<<"$out"; then
+  # -e is not optional: a pattern that begins with "-" would otherwise be parsed as options,
+  # and the check would fail with "no search PATTERN specified" while looking like a real
+  # measurement failure. That happened once and cost a full gate run to diagnose.
+  if grep -qE -e "$pattern" <<<"$out"; then
     printf '  %-42s PASS\n' "$name"; passed=$((passed + 1))
   else
     printf '  %-42s FAIL\n' "$name"; failed=$((failed + 1))
@@ -37,7 +40,7 @@ run "clippy -D warnings"               cargo clippy --workspace --all-targets --
 run "clippy (parallel)"                cargo clippy -p overtone-sim --features parallel --all-targets -- -D warnings
 run "cargo test --workspace"           cargo test --workspace
 run "cargo test (parallel)"            cargo test -p overtone-sim --features parallel
-for c in sim rl spec lie gsim walk wfc qd graph; do
+for c in sim rl spec lie gsim walk wfc qd graph opt; do
   run "overtone-$c -> wasm32"          cargo build -p "overtone-$c" --target wasm32-unknown-unknown
 done
 run "wasm-pack build"                  wasm-pack build crates/overtone-wasm --target web --out-dir pkg --release
@@ -91,6 +94,40 @@ expect "conditioning pays only on periodic structure" \
   'two-periodic +0\.0197 +0\.0000 +0\.13' \
   cargo run --release -q -p overtone-walk --example transport
 
+# Phase 8, M24-M27. Each of these is a claim the README makes, and each is a claim the spec
+# gets wrong, so the pattern pins the number rather than merely the fact that it ran.
+expect "exact arithmetic does not flatline" \
+  'Nelder-Mead +0\.0[0-9]+ +0\.00e0 +5/5' \
+  cargo run --release -q -p overtone-opt --example flatline
+
+expect "shots needed are exponential, CMA-ES shallowest" \
+  'CMA-ES +0\.6[0-9]+ +0\.9[0-9]+' \
+  cargo run --release -q -p overtone-opt --example flatline
+
+expect "kappa=1 fits an expectile, kappa=0 a quantile" \
+  '100000 +0\.3[0-9]+ .* 0\.01[0-9]+' \
+  cargo run --release -q -p overtone-rl --example shot_dial
+
+expect "shots do not narrow the return distribution" \
+  '10000 +0\.68' \
+  cargo run --release -q -p overtone-rl --example shot_dial
+
+expect "the two Laplacians differ on a maze" \
+  'maze \(irregular\): +\|\| L/d - L_norm \|\|_inf = 8\.0' \
+  cargo run --release -q -p overtone-graph --example eigenoptions
+
+expect "Go-Explore loses at 2751 vertices" \
+  '2751 +160 .* 8/21' \
+  cargo run --release -q -p overtone-graph --example eigenoptions
+
+expect "the gate-count penalty has the wrong sign" \
+  'gate count +-0\.[45]' \
+  cargo run --release -q -p overtone-qd --example architecture
+
+expect "reach alone beats the combined reward" \
+  'reach alone, as a selector: top 20 mean J 0\.[56]' \
+  cargo run --release -q -p overtone-qd --example architecture
+
 # The page must boot and populate its readouts from the engine, Closure chapter included.
 if command -v google-chrome >/dev/null 2>&1; then
   mkdir -p web/pkg
@@ -104,7 +141,9 @@ if command -v google-chrome >/dev/null 2>&1; then
   kill "$server" >/dev/null 2>&1
   for check in 'id="loading"!' '<b id="r-ceiling">[0-9]+</b>' '<b id="hero-lambda">[0-9]' \
                '<b id="cl-dim">28</b>' '<b id="cl-var">0\.1071</b>' \
-               '<b id="mn-beta">0\.827</b>' '<b id="mn-regime">superdiffusive</b>'; do
+               '<b id="mn-beta">0\.827</b>' '<b id="mn-regime">superdiffusive</b>' \
+               '<b id="lt-eigenvalue">0\.0[0-9]+</b>' '<b id="lt-error">[0-9]' \
+               '<b id="lt-classical">[0-9]'; do
     if [ "${check: -1}" = "!" ]; then
       if grep -q "${check%!}" <<<"$dom"; then
         printf '  %-42s FAIL\n' "page boots (no loading state)"; failed=$((failed + 1))

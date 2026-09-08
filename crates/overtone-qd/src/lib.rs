@@ -60,11 +60,13 @@
 
 #![forbid(unsafe_code)]
 
+pub mod architecture;
 pub mod archive;
 pub mod behaviour;
 pub mod genome;
 pub mod search;
 
+pub use architecture::{algebraic, algebraic_reward, verify, Algebraic, Candidate};
 pub use archive::{Archive, Bins, Cell};
 pub use behaviour::{measure, Behaviour};
 pub use genome::Genome;

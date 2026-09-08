@@ -4,9 +4,10 @@
 // (Part IV 5.4). Frames are never interpolated -- a discrete-time process that glides is a
 // lie about the process.
 
-import init, { Closure, Lab, Landing, Menagerie, Plateau, Wfc, version } from '../pkg/overtone_wasm.js';
+import init, { Closure, Lab, Landing, Lattice, Menagerie, Plateau, Wfc, version } from '../pkg/overtone_wasm.js';
 import * as panel from './panels.js';
 import * as men from './menagerie.js';
+import * as lat from './lattice.js';
 import { landing, lattice } from './closure.js';
 import * as sound from './sound.js';
 
@@ -26,6 +27,8 @@ let tiles = null;
 let lastCollapse = 0;
 let raceData = null;
 let frameCost = null;
+let maze = null;
+let mazeGeometry = null;
 
 function config() {
   return {
@@ -252,11 +255,34 @@ function wire() {
     const on = e.target.checked ? sound.toggle() : (sound.stop(), false);
     e.target.checked = on;
   });
+  ['lt-mode', 'lt-time', 'lt-exponent', 'lt-alpha'].forEach((id) =>
+    $(id).addEventListener('input', drawLattice));
+  $('lt-seed').addEventListener('input', buildLattice);
   window.addEventListener('resize', () => {
     draw();
+    drawLattice();
     if (sweepData) panel.plateau($('c-plateau'), sweepData);
     if (land) landing($('c-landing'), land, land.shown);
     drawWorld();
+  });
+}
+
+// The eigensolve happens once per maze, in Rust. Everything the sliders move is a
+// recombination of a basis that is already there.
+function buildLattice() {
+  maze = new Lattice(16, 12, +$('lt-seed').value);
+  mazeGeometry = lat.geometryOf(maze);
+  $('lt-mode').max = String(Math.min(20, maze.order() - 1));
+  drawLattice();
+}
+
+function drawLattice() {
+  if (!maze) return;
+  lat.drawAll(maze, mazeGeometry, {
+    mode: +$('lt-mode').value,
+    timeIndex: +$('lt-time').value,
+    exponent: +$('lt-exponent').value,
+    alpha: +$('lt-alpha').value / 100,
   });
 }
 
@@ -275,6 +301,7 @@ init().then(() => {
   buildClosure();
   buildWfc();
   buildWorld();
+  buildLattice();
   requestAnimationFrame(loop);
   // The measurement is a few hundred random circuits per width; let the page paint first.
   setTimeout(buildLanding, 32);

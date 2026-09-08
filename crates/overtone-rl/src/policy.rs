@@ -83,7 +83,11 @@ impl Policy {
     }
 
     /// `<Z_0>` and its gradient with respect to the circuit parameters.
-    fn observable_value_grad(&self, params: &[f64], s: &[f64]) -> (f64, Vec<f64>) {
+    ///
+    /// Public so that the shot dial of Part V 4 can hold `dz` fixed while varying only how
+    /// `z` is measured -- which is the whole point of that measurement, and cannot be done
+    /// through a wrapper that recomputes both.
+    pub fn observable_value_grad(&self, params: &[f64], s: &[f64]) -> (f64, Vec<f64>) {
         let circuit = self.ansatz.build(s);
         let circuit_params = &params[..self.ansatz.num_params()];
         let vg = adjoint::value_and_grad(&circuit, circuit_params, &self.observable);

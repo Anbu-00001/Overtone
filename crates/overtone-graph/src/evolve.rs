@@ -43,7 +43,12 @@ impl Eigenbasis {
         Eigenbasis::of_matrix(&graph.adjacency_matrix(), graph.order())
     }
 
-    fn of_matrix(m: &[f64], n: usize) -> Eigenbasis {
+    /// Diagonalise any symmetric matrix in this basis's layout.
+    ///
+    /// Public because the option-discovery module of Part V 6 needs the *normalized*
+    /// Laplacian, which is a different diffusion model rather than a different graph, and
+    /// building a second eigensolver for it would let the two drift apart.
+    pub fn of_matrix(m: &[f64], n: usize) -> Eigenbasis {
         let mut a = m.to_vec();
         let mut vectors = vec![0.0; n * n];
         let values = overtone_mps::linalg::jacobi_eigh(&mut a, n, &mut vectors);

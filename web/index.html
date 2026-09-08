@@ -247,6 +247,62 @@
   </p>
 </section>
 
+<main>
+<section class="prose">
+  <h2>One eigendecomposition, three fields</h2>
+  <p>Mahadevan's proto-value functions are basis functions learned from the topology of a
+  state space rather than from its rewards: in the discrete case, the eigenvectors of the
+  graph Laplacian. A classical random walk on the same maze evolves under
+  <span class="m">e^(-Lt)</span>; a continuous-time quantum walk under
+  <span class="m">e^(-iLt)</span>. Both are diagonal in that one basis, so the eigenvectors
+  of this maze are simultaneously the RL basis functions, the eigenmodes of the quantum walk,
+  and the graph Fourier transform of the corridors.</p>
+  <p>Part V writes the toggle as <span class="m">e^(-Lt)</span> against
+  <span class="m">e^(-iAt)</span>. Those are two different operators, and they agree up to an
+  unobservable phase only on a regular graph. A maze is never regular — a dead end has degree
+  one and a crossing four — so both sides here use <span class="m">L</span>, and the claim
+  that one character changed is then literally true.</p>
+  <p>The spread readout is there because "the quantum walk spreads faster" is false without a
+  time attached. It leads early, is passed near <span class="m">t = 4</span>, and is behind
+  again by <span class="m">t = 8</span>: unitary on a finite graph, so it never settles and
+  the modes come back into phase. Diffusion, having only decaying modes, only ever spreads.</p>
+  <p>Below, the same maze as a control problem. Todorov's restriction — the controller may
+  only reshape the passive dynamics, and pays a KL cost for it — makes the Bellman equation
+  linear in <span class="m">z = exp(-v)</span>. So the desirability field appears without
+  training, and two solved tasks add: move the sliders and a correct policy for a third task
+  that nobody solved appears as a weighted sum. The error against solving it from scratch is
+  printed beside it. The linearity is bought with that restriction, which belongs on the
+  panel next to the result.</p>
+</section>
+</main>
+
+<section class="instrument">
+  <div class="controls">
+    <label>mode <input id="lt-mode" type="range" min="0" max="12" value="1"><b id="lt-mode-value">1</b></label>
+    <label>time <input id="lt-time" type="range" min="0" max="120" value="30"><b id="lt-time-value">--</b></label>
+    <label>exponent
+      <select id="lt-exponent">
+        <option value="0">real: e^(-Lt), diffusion</option>
+        <option value="1">imaginary: e^(-iLt), interference</option>
+      </select>
+    </label>
+    <label>alpha <input id="lt-alpha" type="range" min="0" max="100" value="50"><b id="lt-alpha-value">0.50</b></label>
+    <label>seed <input id="lt-seed" type="number" value="7" min="0" max="99999"></label>
+  </div>
+  <div class="panel-grid">
+    <canvas id="c-mode"></canvas>
+    <canvas id="c-walk"></canvas>
+    <canvas id="c-compose"></canvas>
+  </div>
+  <p class="readouts">
+    <span>lambda_k <b id="lt-eigenvalue">--</b></span>
+    <span>&lt;d&gt; classical <b id="lt-classical">--</b></span>
+    <span>&lt;d&gt; quantum <b id="lt-quantum">--</b></span>
+    <span>|composed - solved| <b id="lt-error">--</b></span>
+    <span class="dim" id="lt-note"></span>
+  </p>
+</section>
+
 <footer>
   <p><span id="version">overtone-sim</span> · every number on this page is computed in your
   browser by the same engine the tests run against · gradients verified against Yao.jl to

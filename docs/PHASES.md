@@ -437,7 +437,7 @@ two-particle statistics, and M9's learned coin.
 
 ---
 
-## Phase 8 — Exotic  *(M22, M23 done; M24–M27 outstanding)*  — PARTIAL
+## Phase 8 — Exotic  *(M22–M27)*  — DONE
 
 **Spec:** Part V.
 
@@ -506,17 +506,110 @@ Fourier transform of the maze. One eigendecomposition, three fields.
   `1/rho` — and every distance rounds to the exact hop count. The eigenproblem framing, which
   is the interesting part, survives intact.
 
+**M24 — the optimiser flatline — done.** Part V §5.2's demonstration, and the correction it
+needs to be true. `overtone-opt` holds all four optimisers — plain gradient, natural gradient
+on the QFIM, CMA-ES with Hansen's defaults, Nelder–Mead with Nelder and Mead's — and every
+one is checked on the sphere and on Rosenbrock before it is allowed near a plateau, because a
+broken optimiser flatlines too.
+
+**M25 — distributional RL and the shot dial — done.** A quantile critic in `overtone-rl`
+following Dabney et al., scored against the closed-form two-atom return distribution of
+`SpectralControl`, plus the shot-budget dial the same shot machinery provides.
+
+**M26 — eigenoptions and Go-Explore — done.** Machado et al.'s eigenpurposes, eigenbehaviors
+and termination sets on the maze Laplacian M22 already computes, and Ecoffet et al.'s
+return-then-explore against a loop-erased random walk on the same maze.
+
+**M27 — architecture search into the Menagerie — done**, together with the verification step
+Part V §10 refuses to let it ship without.
+
+**The `Lattice` panel — done.** Proto-value function `k` over the maze, the real-versus-
+imaginary exponent toggle with the spread readout beside it, and the two-slider composition
+panel that prints its own error against solving the composite task from scratch.
+
+**Exit criteria — met**
+- All four optimisers reach the minimum of the sphere and of Rosenbrock before any plateau
+  result is read. CMA-ES to `1e-6` on Rosenbrock, Nelder–Mead to `1e-4`.
+- The finite-shot estimator is the binomial one: unbiased, with the documented variance,
+  checked against 4000 draws.
+- The metered parameter-shift gradient agrees with the adjoint gradient to `1e-10`.
+- The quantile critic reaches the discretisation floor of its own 21-quantile representation,
+  `0.0179` against a floor of `0.0174`.
+- Every eigenoption terminates somewhere (Machado et al. Theorem 3.1), and running one never
+  descends its own eigenvector.
+- Go-Explore's archived route is within four hops of the shortest path.
+- Selecting architectures on the reach beats random selection on all ten seed/size
+  combinations tried.
+
+**Corrections carried forward from M24–M27**
+- **The optimiser flatline is a statement about shots, not about arithmetic.** Arrasmith et
+  al. say the cost function *differences* are exponentially suppressed, so "the numbers of
+  shots required in the optimization grows exponentially with the number of qubits". Written
+  against `f64` expectation values every optimiser gets sixteen digits free, which is far more
+  than the `2^(-1.03 n)` differences at any simulable width. Measured: with exact arithmetic
+  **all four descend at every `n` from 2 to 10, on every seed**, Nelder–Mead included. The
+  demonstration as Part V §5.2 describes it shows the opposite of the paper it cites.
+- **"All four flatline" is too strong, and the exponents differ by more than a factor of
+  two.** Shots per evaluation needed before an optimiser beats its own noise, `n = 2` to `10`:
+  gradient `16 → 32768`, natural gradient `32 → 16384`, Nelder–Mead `256 → beyond 65536`,
+  **CMA-ES `16 → 512`**. Fitted as `shots ~ 2^(a n)`: `a = 1.45` (`R² = 0.969`), `1.25`
+  (`0.936`), `1.25` (`0.954`), and `0.60` (`0.973`). All four are exponential, which is the
+  paper's result; they are not the same exponent, and a population method whose decision is a
+  rank over `lambda` samples survives roughly four times longer in `n`.
+- **A noisy optimiser must not be scored on the best value it saw.** That is a minimum over
+  many draws, so it rewards the optimiser that evaluated most and rewards the noise itself.
+  Every lane is scored on the *exact* cost at the point it stopped, computed off the meter.
+  At `n = 4` with 100 shots the natural-gradient lane believed it had reached `-0.52`; the
+  exact cost where it actually stopped was `+0.25`, above where it started.
+- **Part V §4 is wrong that more shots sharpen the return distribution.** Two distributions
+  are in play and only one depends on the shot count. The return distribution is aleatoric —
+  two atoms at `±cos(ks)` — and its spread is flat at `0.68` from 10 shots to 10000. What
+  sharpens is the *estimate*. What shots really buy is the **score function**: `grad log pi`
+  is nonlinear in the measured `z`, so a cheap measurement biases the gradient, and that bias
+  falls as `1/N` — `0.052`, `0.0029`, `0.0004`, `0.00008`.
+- **Dabney et al.'s `kappa = 1` fits an expectile, not a quantile, on returns of order one.**
+  The published default was chosen against Atari returns in the hundreds. Here every residual
+  falls inside the Huber quadratic, so the subgradient is `u` rather than `sign(u)` and the
+  fixed point moves. Measured: `kappa = 1` stalls at `W₁ = 0.328` at any sample count, while
+  `kappa = 0` reaches `0.0179`. The paper's `rho^0_tau = rho_tau` also has to be special-cased,
+  since reading eq. 9 literally at `kappa = 0` gives no gradient at all.
+- **Machado et al. use two different Laplacians in two different sections.** §2.3 says
+  plainly "the normalized graph Laplacian, which we use in this paper"; §5's sample-based
+  algorithm recovers the combinatorial one, by Theorem 5.1's `T^T T = 2(D − W)`. On a regular
+  graph those are one diffusion model — `‖L/d − L_norm‖∞ = 2e-16` on a cycle — and on a maze
+  they are two, at `0.80`, disagreeing on the chosen action at `0.594` of states.
+- **Do not compare eigenvector-derived options on a graph with a degenerate spectrum.** The
+  first control here was a 24-cycle, whose Laplacian eigenvalues come in pairs; inside a
+  degenerate eigenspace any rotation is a valid basis, so two solvers differ for reasons that
+  are not about the graph. The maze's low spectrum is simple to `3.8e-3`, which is why the
+  disagreement there is real. The matrix-level statement needs no such caveat and is the one
+  the test makes.
+- **An option's terminate action has value exactly zero, so the comparison against it needs a
+  tolerance at the scale of the eigenvector.** Without one the *constant* mode, whose
+  eigenpurpose is identically zero, acquires an initiation set of 94 states on a 101-vertex
+  maze built entirely out of `1e-17`.
+- **Go-Explore does not beat an undirected walk at every size, and the crossover is the
+  budget.** Loop-erasing both trajectories so the comparison is between two post-processed
+  answers: at 101 vertices they tie; at 962 the archive finds the goal 21/21 against 12/21;
+  at 2751 it finds it **2/21 against 8/21**. At four times the budget on that same maze it is
+  21/21 against 20/21. Return-then-explore spends its opening steps building an archive and
+  only then aims, so Part V §6's claim holds in a window set by how many steps the agent gets.
+- **Part V §3's algebraic reward is beaten by its own reach term.** The verification §10
+  demands, over 200 architectures trained to convergence on the exact policy gradient:
+  reach `rho = 0.618`, the covers-`k` indicator `0.581`, **the gate-count penalty `-0.486` —
+  the wrong sign** — and the `dim(g)` indicator `-0.060`. Gates track layers and layers track
+  the frequency ceiling, so charging for gates charges for reach. Selecting the top 20 by the
+  three-term reward is indistinguishable from random (five seeds above, five below); selecting
+  on reach alone beats random on all ten and beats the combined reward on nine.
+- **The `dim(g)` term cannot be validated on a problem small enough to validate it on.**
+  It is a *trainability* proxy, and two to five qubits with an exact analytic gradient has no
+  barren plateau to be saved from. That is the same reason M19's fitness-by-`dim(g)` profile
+  came out flat and the same reason M24's flatline needed shot noise to appear at all. The
+  conclusion is not that `dim(g)` fails to predict trainability; it is that this environment
+  cannot test the claim, and a term nobody can validate should not carry a weight.
+
 **Outstanding**
-- **M24 — the optimiser flatline.** Part V §5.2's demonstration: four optimisers deep in a
-  barren plateau, all flat, with Arrasmith et al. cited. The plateau instrument exists
-  (Phase 3) and the citation is already load-bearing elsewhere — see Phase 7's M19
-  corrections, where the same paper refuted Part IV §4.
-- **M25 — distributional RL and the shot-budget dial.**
-- **M26 — eigenoptions and Go-Explore.** Eigenoptions are built from the same Laplacian
-  spectrum M22 now computes, so the marginal cost is low.
-- **M27 — architecture search into the Menagerie.** The archive it feeds exists as of M19.
-- **The browser panel for M22 and M23.** The engines and their numbers are done and tested;
-  the `Lattice` tab that Part V §1.3 and §2.3 describe is not built.
+- Nothing in Part V. Phase 8 is complete.
 
 ---
 

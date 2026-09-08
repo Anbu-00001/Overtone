@@ -1,14 +1,15 @@
 [package]
-name = "overtone-graph"
+name = "overtone-opt"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "Maze graphs, the shared eigenbasis, and linearly-solvable MDPs"
+description = "Optimisers, finite-shot estimation, and the barren-plateau flatline"
 
 [dependencies]
+overtone-sim.workspace = true
+overtone-spec.workspace = true
 overtone-mps.workspace = true
 rand.workspace = true
 rand_chacha.workspace = true
-overtone-wfc.workspace = true

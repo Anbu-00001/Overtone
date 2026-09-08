@@ -195,6 +195,8 @@ version = "0.1.0"
 dependencies = [
  "overtone-mps",
  "overtone-wfc",
+ "rand",
+ "rand_chacha",
 ]
 
 [[package]]
@@ -221,6 +223,17 @@ version = "0.1.0"
 dependencies = [
  "overtone-rl",
  "overtone-sim",
+]
+
+[[package]]
+name = "overtone-opt"
+version = "0.1.0"
+dependencies = [
+ "overtone-mps",
+ "overtone-sim",
+ "overtone-spec",
+ "rand",
+ "rand_chacha",
 ]
 
 [[package]]
@@ -278,6 +291,7 @@ dependencies = [
 name = "overtone-wasm"
 version = "0.1.0"
 dependencies = [
+ "overtone-graph",
  "overtone-gsim",
  "overtone-lie",
  "overtone-rl",
