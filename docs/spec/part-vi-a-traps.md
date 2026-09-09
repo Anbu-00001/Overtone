@@ -4,6 +4,18 @@
 
 ---
 
+## Corrections
+
+**The body below is unchanged**, per the convention in Part II. Corrections are recorded here
+and reasoned out in `docs/PHASES.md`.
+
+| Section | Correction | Source |
+|---|---|---|
+| §T2 | The AB cage has a published instance that needs no flux and no lattice geometry at all. Krovi & Brun exhibit **infinite hitting times on the hypercube** from destructive interference alone — the walker provably never arrives. **It is a DFT-coin phenomenon**: the Grover coin on the same graph, from the same start, arrives with probability one, and on the 3-cube the DFT coin does too. Measured on the 4-cube: `3/7` of the amplitude is trapped forever. Named as a note under T2, per §8's standing rule against a ninth trap. | Decisions-03 §11; Phase 14 |
+| §T2 escape | "re-parameterise the coin" is the listed escape from the AB cage, and this instance is the cleanest possible demonstration that it is the *right* escape: the cage is a property of the coin, not of the terrain. | Phase 14 |
+
+---
+
 ## 0. Why traps, and the rule they must obey
 
 The arena in Part VI has agents, a pursuer, and movement that computes. What it lacks is **terrain that matters**. Without it the maze is a container and the strategy is a chase.

@@ -31,14 +31,22 @@
 #![forbid(unsafe_code)]
 
 pub mod coin;
+pub mod coined;
+pub mod families;
+pub mod hitting;
 pub mod race;
+pub mod reduced;
 pub mod stats;
 pub mod substrate;
 pub mod two;
 pub mod walk;
 
 pub use coin::Coin;
+pub use coined::{Coined, VertexCoin};
+pub use families::{classical_hitting, hypercube, welded_tree, Family};
+pub use hitting::{concurrent, one_shot, one_shot_uniform, residual, Concurrent};
 pub use race::{optimise_coins, race, Entrant};
+pub use reduced::{amplify, hypercube_time, welded_best, welded_horizon, Amplification, Line};
 pub use stats::{classical_sigma, fit_exponent, regime, regime_of, PowerLaw};
 pub use substrate::{Substrate, Word, ALL_WORDS};
 pub use two::{correlate, evolve, similarity, Column, Correlation, Modes, Statistics};

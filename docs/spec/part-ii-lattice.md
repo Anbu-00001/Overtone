@@ -6,6 +6,24 @@
 
 ---
 
+## Corrections
+
+**The body below is unchanged.** Where measurement or a later ruling has contradicted this
+spec, the correction is recorded here rather than edited into the text, so that what was
+believed at the time stays readable and the disagreement stays visible. The full reasoning is
+in `docs/PHASES.md`; the operational form is in `CLAUDE.md`.
+
+| Section | Correction | Source |
+|---|---|---|
+| §4 P5 | The `(4n+2)` column reduction is not a rendering choice. It is the literal computation the demo runs: at `n = 10` the welded tree's 4094 vertices and 12 280 arcs become a 42-wide vector. | Decisions-03 Q7.5; Phase 14 |
+| §4 P6 | Three different things are called hitting time — one-shot, concurrent, and marked-vertex search. This section quotes Szegedy's `√HT` **search** result and applies it to entrance-to-exit **traversal**. Those are different problems and the square root does not carry across. | Decisions-03 §3; Phase 14 |
+| §4 P7 | A learned, position-conditioned coin is exactly the "arbitrary position-dependent coin" that the coined/Szegedy equivalence excludes. It inherits **no** quadratic hitting-time guarantee. Any win over the Grover coin is an empirical finding needing its own justification. | Decisions-03 Q7.2; open (M9) |
+| §6 | The Szegedy module is deleted, not deferred. Two coined applications are one Szegedy application under a Grover coin and a flip-flop shift, so there was never a second engine to write. | Decisions-03 Q7.2 |
+| §7 M8 | The acceptance clause "the `√HT` slope fits" is unsatisfiable as written, for the P6 reason above. Replaced by Kempe's one-shot hitting on the hypercube against the exact classical `2^n` — the same claim (a provable separation in traversal time) with a theorem that is about traversal. | Decisions-03 §3; Phase 14 |
+| §9 | The reference frame the section is missing: the walk's *coin* can cage it. With the DFT coin on the 4-cube exactly `3/7` of the amplitude never reaches the far corner, on a graph with no walls at all. | Krovi & Brun; Phase 14 |
+
+---
+
 ## 1. The reframe: this is not a maze game
 
 The request was an endless maze with agents exploring it. The version of that idea worth building is not a sprite in a corridor. It is this:
