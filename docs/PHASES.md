@@ -1,7 +1,8 @@
 # OVERTONE — phase plan
 
 The specs define milestones M0–M52 across ten documents: Parts I–IX plus the Part VI-A
-traps addendum. This file groups them into twelve executable phases with explicit entry and
+traps addendum, as amended by the two Decisions documents. This file groups them into
+thirteen executable phases with explicit entry and
 exit criteria. A phase is done when its exit criteria are green in CI, not when its code is
 written.
 
@@ -1120,6 +1121,300 @@ constraint exist to prevent. The physics it renders is already there and has bee
   the same XOR one level apart — but nothing in the workspace is yet slow because of repeated
   position evaluation. It becomes real work the moment M49's per-cell budget binds, and the
   measurement above says exactly when that is.
+
+---
+
+## Phase 13 — Statistics, the notation, and the benchmark  *(M28, M40, M41)*  — DONE
+
+**Spec:** Part VI §1, Part VIII §1, §8, §10. **Entry:** Phase 9's `overtone-orbit` and Phase 7's
+`overtone-walk`. **Exit:** the gate lines below.
+
+**M28 — two walkers, and the class system that follows.** `overtone-walk::two`. Part VI §1
+claims an agent's class *is* its exchange statistics and that combat is what happens when two
+amplitude fields overlap. Part VI §8 sets the stakes: if the published patterns do not
+reproduce, "the arena's physics is wrong and everything built on it is theatre."
+
+Sansoni et al.'s Eq. (1) is implemented directly —
+`A_KL = U_IK U_JL + e^{i phi} U_IL U_JK` — with `phi = 0` bosonic, `pi` fermionic, and the
+generic phase anyonic. Measured, on a 4-step Hadamard walk with both walkers entering one
+site in opposite coins:
+
+```
+statistics   phi/pi   mode diagonal   position diagonal
+bosonic        0.00        0.187500            0.437500
+anyonic        0.25        0.160041            0.387159
+anyonic        0.50        0.093750            0.265625
+anyonic        0.75        0.027459            0.144091
+fermionic      1.00        0.000000            0.093750
+```
+
+Bunching falls monotonically with `phi`, the endpoints are the two named statistics, and
+`similarity(bosonic, fermionic) = 0.771` — three genuinely different distributions, so the
+class system is not decorative.
+
+**The correction: Part VI §1's fermionic row is wrong.** It says a fermionic agent "cannot be
+entered — occupying a corridor blocks it." Look at the two columns above. The fermionic
+**mode** diagonal is exactly zero; the fermionic **position** diagonal is `0.09375`. Sansoni
+et al. say why in as many words — "some of the diagonal elements of the fermionic two-particle
+walk are nonzero" — because a coined walk carries a site *and* a coin, and their Eq. (4) state
+`(|j,U> - |j,D>)/sqrt 2` is antisymmetric while sharing a site. **Pauli exclusion forbids two
+fermions in the same mode, not on the same site.** A fermionic agent blocks one coin state in
+a corridor and leaves the other open, which is a real defensive property and a smaller one
+than the spec claims.
+
+Exclusion is implemented **exactly**: `Statistics::phase_factor` returns a literal `-1` rather
+than `expi(PI)`, because `expi(PI)` carries an imaginary part of `1.2e-16` that leaves the
+fermionic diagonal at `1e-34` instead of at zero. The test is then an equality, not a
+tolerance somebody has to justify.
+
+**A trap worth keeping.** The first version of the experiment put the walkers on *adjacent*
+sites and every statistic gave the identical distribution. A coined walk preserves the parity
+of `site + step`, so walkers one site apart occupy disjoint sublattices forever, every
+exchange term is zero against a non-zero direct term, and a test built that way passes while
+measuring nothing. It is pinned as its own test.
+
+**On the citation, against an audit.** An external prior-art audit recorded Part VI §1's
+Sansoni citation as CONTRADICTED — "they demonstrated bosonic bunching and fermionic
+antibunching only" — and asked for the anyonic claim to be recited to van Exter et al. The
+paper's body says otherwise, verbatim: *"we therefore prepared some anyonic states |Psi_phi>,
+in particular with phi = pi/4, pi/2, 3pi/4, and measured the output probabilities"*, with
+Fig. 4(c) captioned "anyonic (with phi = pi/2)". The audit's error is explicable — the
+*abstract* names only bosons and fermions — and the general rule it teaches is worth keeping:
+**an abstract is not a source.** The audit's substantive point survives and is kept: Sansoni
+et al. *simulate* exchange with photon polarisation rather than producing anyons, so van
+Exter, Nienhuis & Woerdman (PRA 85, 033823) is cited alongside, not instead.
+
+**M41 — the notation.** `overtone-otn`. Part VIII §12 says to read PGN and FEN first; four
+decisions came straight out of them. A mandatory header roster with free extension around it
+(PGN's Seven Tag Roster). A permissive **import** format and a byte-exact **export** format,
+because PGN requires that two programs' output be "exactly equivalent, byte for byte". A `%`
+escape line for private data, same character and same meaning. And FEN's real lesson —
+*record what the engine needs to resume, not what a reader could infer* — which is why an
+`.otn` position is a seed plus a move list rather than a dump of `2^n` amplitudes.
+
+Two traps the format had to design around, both load-bearing:
+
+- **`DefaultHasher` cannot back a self-verifying format.** Part VIII §1 wants a hash so that
+  re-running is a proof; Rust's default hasher is documented as unstable across releases, so
+  a file written by one toolchain would stop verifying under another. FNV-1a is written out.
+- **Hashing raw `f64` bits would make the proof platform-dependent.** This repo's own
+  `wasm_determinism.sh` measures native-vs-wasm agreement at `5.6e-16` — a tolerance, not
+  bit-equality — so a raw-bit hash would disagree between a native and a browser replay of the
+  same game, which is the exact case the hash exists to catch. Amplitudes are quantised to
+  `1e-9` first: four orders above the asserted tolerance, far below anything playable.
+
+**M40 — `Overtone-100`.** Part VIII §8 argues the benchmark is the better artifact and should
+come first, and Part VIII §10 sets the bar: every solution verified against brute force.
+100 positions, all 100 answers re-derived by an independent route, `246` bytes each:
+
+```
+conversion    40   hop counts 5..9, eigensolve checked against BFS
+escape-in-1   30   6..12 escaping moves each, found exhaustively
+reachability  30   15 reachable, 15 not
+```
+
+Only categories with a *provable* answer are in the set. Part VI-A's spectral traps and cage
+escapes are deliberately excluded: their ground truth would come from the same certificate the
+puzzle is meant to test, and a benchmark whose answer key is the system under test is
+worthless. They wait for an independent oracle.
+
+**Two generator bugs the acceptance criterion caught**, both worth recording because both
+would have shipped a benchmark that measured nothing:
+
+- The first mate category asked whether a move made *the mover* checkmate, which is self-mate.
+  It produced zero positions and the set-size assertion caught it. Replaced with escape-in-one,
+  which is well posed: in check now, fully safe after exactly one move.
+- The first reachability category came out **27 reachable to 3** — a category a solver scores
+  90% on by answering the same thing every time. Excluding the start cell from the safe set
+  puts every position in check so the algebra decides, and the split is now 15/15. `balance()`
+  reports it and a test fails if the skew returns.
+
+### Exit criteria — met
+
+- `pauli exclusion is exact in the mode basis` — identically zero, not a tolerance
+- `two fermions share a site` — position diagonal `0.09375`, the Part VI §1 correction
+- `anyonic phase interpolates` — monotone across `0, pi/4, pi/2, 3pi/4, pi`
+- `adjacent inputs cannot interfere` — the parity trap, pinned
+- `otn round-trips byte-exactly` — writing what was read is a fixed point
+- `every roster tag is required`, `a future version is refused rather than guessed`
+- `Overtone-100 all-verified` — 100/100 re-derived independently
+- `no category can be guessed` — reachability skew below 0.34
+
+---
+
+## The Decisions documents, and what they change
+
+Two rulings documents supersede parts of the specs where they conflict:
+[`decisions-01-phase-10.md`](spec/decisions-01-phase-10.md) rules on the eight open Phase 10
+questions; [`decisions-02-synthesis.md`](spec/decisions-02-synthesis.md) synthesises four
+external research passes into a claims audit. Both are committed to `docs/spec/` because a
+ruling that lives outside the repository is a ruling that gets lost.
+
+**The one that reorders everything.** Decisions-01 Q1: `d` is a property of *(game, strategy
+language)*, so the agent language is part of the experimental apparatus and must be frozen
+before `d` is measured. Worse, a pure declarative feature-weight policy has **no compute axis
+at all** — it is `O(1)` per move — so if the league's submission format were a policy spec,
+`d` would be *undefined* over the league population rather than merely mismatched. The
+resolution is to declare the **search**, not the policy: `search.kind ∈ {greedy, negamax,
+mcts}` with `budget` as the compute axis, and the feature weights as the `[agent.eval]` block
+both searches consume. MCTS is primary for a physical reason — Overtone is stochastic, and
+expectimax's chance nodes would be 1024-way at `n = 10`.
+
+```
+was:   M38 board → M39 ladder → … → M41 notation → M43 league
+is:    M41a agent-language freeze (v1) → M39 ladder → M38 board → M43 league
+```
+
+**Status of each ruling.**
+
+| Ruling | Status |
+|---|---|
+| Q1 — unify the language; declare the search; M41a before M39 | **pending** — blocks Phase 10 |
+| Q2 — work units under a published cost model; publish both curves | **pending** |
+| Q3 — Goodman grid, not adjacent rungs; pre-register `N`, 0.95, `STEP_UNIT = 2σ` | **pending** |
+| Q4 — invented number = one that changes an outcome; `presentation.toml` + perturbation test | **pending** |
+| Q5 — Born distribution in the measurement basis; no bucketing, no log default | **pending** (M46) |
+| Q6 — decouple: field recomputes per ply, progressive fill; 60 fps was never the bar | **pending** (M49) |
+| Q7 — fixed scale from the Atlas 99th percentile, visible clipping, numeric max on screen | **pending** (M49) |
+| Q8 — memo table keyed on discrete state only; amplitudes are the value | **pending** |
+| D2 — M28 citation split: Sansoni + van Exter | **applied**, with a correction (Phase 13) |
+| D2 — Part VI §1 anyonic citation "CONTRADICTED" | **rejected on the primary source** (Phase 13) |
+
+### The v1 feature freeze, measured
+
+Decisions-03 Q1 ruled six features and said to measure sibling variance before freezing, and
+to profile `temperature` before committing to it. Both were done
+(`overtone-orbit/examples/freeze.rs`, `freeze2.rs`). **Three of the six do not survive, one
+excluded feature comes back, and the ruling's own escape clause fires on `temperature`.**
+
+Two tests are needed, because Q1's sibling test alone is unfair to features that vary with
+*depth* rather than across siblings at one node. A feature is useful if it discriminates
+*either* the moves at a node *or* the leaves a search evaluates.
+
+```
+                      sibling spread   leaf spread   us/call   at 4096/s
+dim_g                       0.546         32.006        0.28   fits
+orbit_size                  0.347             --        3.83   fits
+temperature                 1.207             --      714.11   NO
+safe_set_size               0.000          0.534        0.16   fits
+half_chain_entropy          0.000          5.053        1.00   fits
+separation_deficit          0.027             --        4.00   fits
+coherence                   0.000          0.400        0.00   fits
+average_branching           0.000          0.000        0.00   fits
+```
+
+**Cut — `average_branching`.** Not weak, *structurally constant*. `Game::apply` pushes
+`legal_moves(n).len()`, and `legal_moves` is a function of `n` alone, which never changes
+during a game. The feature is identical for every position, every line and every agent. It
+cannot influence selection under any search.
+
+**Cut — `coherence`.** Both arms of `Game::apply` subtract exactly `self.k`, so coherence is a
+pure function of ply depth. Binned by depth, min equals max within every bin. It is a
+restatement of something the search already knows.
+
+Q1 asked to "confirm that asymmetry is implemented" between `measure` and generator
+application, since `coherence` survives only if it exists. **It is not implemented**, and the
+comment above the measure branch claims otherwise — *"Measuring costs the whole remaining
+coherence block: it is the move that destroys superposition, and Part VII §4 wants that to be
+the expensive one"* — while the code subtracts `k` like the other branch. Part VI §2.2 was
+checked before changing anything, and it says measuring costs coherence *and* destroys the
+spread; it does **not** say it costs more coherence. So the code is defensible and the comment
+is wrong. Making measurement cost extra would change match outcomes, which under Decisions-01
+Q4's own test makes it a mechanic — and an invented one. The comment is corrected; the
+mechanic is not touched; the feature is cut.
+
+**Cut — `separation_deficit`.** §12's first unknown, answered. It computes
+`2·2^n − 2 − (|commutant| + |ideals|) − orbit_dimension`. Every input is a property of the
+algebra or the orbit, and a unitary from `exp(g)` changes neither — it moves *within* the
+orbit. So it changes only on absorption, exactly like `dim_g`, at 4.00 µs against `dim_g`'s
+0.28. Measured sibling spread 0.027 against `dim_g`'s 0.546. Dominated on both axes.
+
+**Restored — `half_chain_entropy`.** Q1 cost-disqualified it, reasoning that at `n = 16` it is
+a 256×256 SVD in the inner loop. At the `n = 6` the game actually runs at it costs **1.00 µs**,
+a million calls a second, and it has the second-largest leaf spread in the table. Its first
+measured sibling spread of zero was a sampling artefact: the sample sat four plies from a
+basis-state opening, where single-qubit generators keep the state near-product and every
+sibling has entropy zero. At depth it ranges 0 to 1.386. It is in v1, with the caveat that its
+cost scales with `n` and must be re-profiled if the window grows.
+
+**Restored — `safe_set_size`.** Its zero sibling spread is structural rather than damning:
+`Game::safe_for` reads the **opponent's** field, so a player's own move cannot change it by
+construction. Across leaves it ranges 32 to 63. The sibling test was measuring the wrong thing
+for this feature.
+
+**`temperature` fires Q1's escape clause.** It is the best discriminator in the table — sibling
+spread 1.207, twice `dim_g`'s — and at **714 µs** it sustains 1,400 calls a second against the
+4,096 an MCTS budget needs. Decisions-01 Q6's per-position cache does not rescue it: every node
+an MCTS expansion touches *is* a different position, so there is nothing to reuse. Q1
+pre-authorised this outcome — *"If it does not, v1 is the other five and you say so in the
+docs"* — so this is that saying.
+
+**Frozen v1 feature vector, in order (weights are positional):**
+
+```
+1. dim_g                material          0.28 us
+2. orbit_size           reachability      3.83 us
+3. safe_set_size        proximity to loss 0.16 us
+4. half_chain_entropy   spread            1.00 us
+```
+
+Four features, total 5.27 µs per evaluation, which sustains ~190,000 evaluations a second —
+comfortably inside a 4,096-node budget. `temperature` remains the heat map (M49) and the move
+*ordering* heuristic, where it is computed once per position rather than once per node.
+
+### Q6, measured: the top of the ladder is the problem
+
+```
+budget    s/game    games in a 6 h job    1600 games needs
+     8     6.75                  3199              3.0 h
+    32    10.05                  2148              4.5 h
+   128   134.96                   160             60.0 h
+```
+
+Decisions-03 estimated a 13.5 s per-game budget and judged the grid comfortable. At budget 128
+a single game takes **135 s**, ten times that, and 1,600 games would need 60 hours against the
+6-hour job limit. The cost is super-linear in budget, so the expensive pairings are exactly the
+high-budget ones the grid needs most.
+
+The ruling's own lever still applies and is now quantified: pairings are unequal, so a
+`(8, 128)` pairing costs roughly half a `(128, 128)` one. But the honest consequence is that
+**high-budget pairings get ~160 games, not 1,600** — a 95% Elo error near ±32 rather than ±10.
+Q6 said to report heterogeneous precision rather than collapse it, and the heterogeneity is
+larger than anticipated. SPRT early-stopping on distant pairs is no longer an optimisation; it
+is what makes the top of the grid affordable at all.
+
+
+**Three rulings are worth restating because they change how things get measured, not just
+what gets built.**
+
+*`STEP_UNIT = 0.65` is an invented number and Q3 says so.* The replacement is measured: play
+an agent against a bit-identical copy of itself, take `2σ` of the spread. Decisions-02 renames
+this a **repeatability calibration** rather than a noise floor, because identical-copy
+self-play is not an established chess-testing convention and the weaker word is harder to
+attack. And it costs what it costs: the 95% Elo error is about `400/√N`, so ±10 Elo needs
+~1,600 games and ±5 needs ~6,400.
+
+*Do not write "the standard Lantz metric."* Lantz et al. explicitly had no system for
+evaluating `d` and left the strategy language, resource levels, performance metric and step
+definition open. The lineage is Lantz 2017 → Tavener 2020 → Browne 2022 (**Skill Trace**) →
+Goodman et al. 2024 (**Skill Depth**). Report Skill Trace, and plot Overtone against Goodman's
+sixteen published values — Dots + Boxes `0.353`, Connect 4 `0.282`, Can't Stop `0.028`,
+Tic-Tac-Toe `0.000` — which is a far better figure than the eyeballed chess/Go comparison in
+Part VII §8 because it is measured on a compatible protocol.
+
+*The headline changes.* Decisions-02 §5: `train a 100-qubit quantum RL policy on a free CPU`
+is a capability flex in a field whose mood punishes them, and it invites a dismissal that
+would be correct. Lead instead with **"Overtone tells you whether your quantum circuit will
+train — before you train it"**, and name the tension in line two rather than hiding it: the
+circuits that train are often the ones a classical computer can already simulate, and Overtone
+measures both. Six of the seven standard dismissals are things this project *measures* rather
+than things it denies, and that table belongs in the README.
+
+**And one claim came back stronger.** Part VII §3's checkmate-as-controllability is novel and
+better than the spec claims: Cantwell's Quantum Chess design notes state that "there is no
+concept of check or checkmate. Kings are captured like any other piece." The orbit formulation
+solves a problem the closest prior work explicitly abandoned. Cite Wu & Tarn (PRA 65, 2002) on
+subspace controllability as its basis.
 
 ---
 

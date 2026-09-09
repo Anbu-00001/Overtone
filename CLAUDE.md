@@ -341,3 +341,26 @@ Credibility is the scarce resource in this field.
   simulation on both sides, so the analogy does not carry and Part VIII 6's framing is wrong
   in kind. Cite it for the idea that verification can be cheaper than execution, not for the
   construction.
+- **Sansoni et al. DID measure anyonic statistics; an external audit said they did not.**
+  The abstract names only bosons and fermions, but the body prepares anyonic states at
+  `phi = pi/4, pi/2, 3pi/4` and Fig. 4(c) plots `phi = pi/2`. Checked against the paper, not
+  against the audit. They *simulate* exchange with photon polarisation rather than making
+  anyons, so cite van Exter et al. (PRA 85, 033823) alongside -- not instead. General rule
+  this is an instance of: **an abstract is not a source.** Read the body before recording a
+  contradiction.
+- **Pauli exclusion is a statement about modes, not about sites.** Part VI 1's "a fermionic
+  agent walls off a corridor" is wrong: a coined walk has a site *and* a coin, so two
+  fermions share a site with opposite coins (Sansoni Eq. 4). Measured: fermionic mode
+  diagonal exactly 0, position diagonal 0.094. A fermionic class blocks one coin state, not
+  the corridor.
+- **Two walkers one site apart never interact.** A coined walk preserves the parity of
+  `site + step`, so adjacent inputs occupy disjoint sublattices forever and every exchange
+  term vanishes. All statistics then give identical distributions and a test built on that
+  arrangement passes while measuring nothing.
+- **`DefaultHasher` cannot back a self-verifying file format** -- it is not stable across
+  Rust releases. And hashing raw `f64` bits would make the hash platform-dependent, since
+  native and wasm agree only to ~5.6e-16. `.otn` uses its own FNV-1a over amplitudes
+  quantised to `1e-9`.
+- **A benchmark category whose answers are lopsided measures nothing.** `Overtone-100`'s
+  reachability set first came out 27 reachable to 3 -- 90% for a solver that always answers
+  the same way. Check `balance()` on any yes/no category before shipping it.

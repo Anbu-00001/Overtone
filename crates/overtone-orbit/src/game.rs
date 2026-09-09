@@ -246,8 +246,16 @@ impl Game {
             }
             Move::Measure { qubit } => {
                 collapse(&mut player.state, *qubit);
-                // Measuring costs the whole remaining coherence block: it is the move that
-                // destroys superposition, and Part VII 4 wants that to be the expensive one.
+                // Measuring costs the same `k` as applying a generator. An earlier comment
+                // here claimed it "costs the whole remaining coherence block" and cited Part
+                // VII 4 for it; the code never did that, and Part VI 2.2 does not ask for it
+                // either -- it says measuring costs coherence *and* destroys the spread, and
+                // the collapse above is that second cost. Charging measurement extra would
+                // change match outcomes, which makes it a mechanic under Decisions 01 Q4's
+                // test, and an invented one. Left symmetric deliberately.
+                //
+                // The consequence: coherence falls by `k` every ply whatever is played, so it
+                // is a pure function of depth and was cut from the v1 feature vocabulary.
                 player.coherence = player.coherence.saturating_sub(self.k);
             }
         }
