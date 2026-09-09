@@ -48,6 +48,49 @@ and it is not built until its depth has been measured headless.
 
 ---
 
+## The instrument, in one diagram
+
+This is `predict`, drawn from the code that implements it
+([`crates/overtone-lie/src/predict.rs`](crates/overtone-lie/src/predict.rs)) rather than from
+the idea of it. The branch on the left is the one that matters: **the tool has a path that
+ends in refusing to answer**, and that path is reached by our own Part I ansatz.
+
+```mermaid
+flowchart TD
+    C["<b>Your circuit</b><br/>encoding gates + trainable rotations"]:::input
+    C --> F{"Does it interleave<br/><b>fixed</b> entangling gates?"}:::gate
+
+    F -->|yes| R["<b>REFUSE</b><br/>a fixed CZ layer is a Clifford, not a<br/>one-parameter subgroup of exp g<br/>— so the circuit is not in exp g and<br/>Theorem 1 says nothing about it<br/><i>No trainability claim follows. Measure it.</i>"]:::refuse
+    F -->|no| G["<b>Lie closure</b> of the trainable<br/>generators, by repeated brackets"]:::work
+
+    G --> D["<b>dim g</b>, against dim su = 4ⁿ − 1"]:::work
+    D --> S{"How does dim g scale?"}:::gate
+
+    S -->|"dim g ≥ ¼ · dim su"| E["<b>EXPONENTIAL</b><br/>barren plateau<br/>not trainable at scale"]:::bad
+    S -->|"dim g ≤ 4n + 4"| L["<b>LINEAR</b>"]:::good
+    S -->|otherwise| P["<b>POLYNOMIAL</b>"]:::good
+
+    L --> T["<b>TRAINABLE</b> — Var dC ~ 1 / dim g<br/>…<b>and therefore also classically<br/>simulable by g-sim</b>"]:::tension
+    P --> T
+    T --> Q["<b>The live question.</b> The circuits that train<br/>are the circuits that are simulable.<br/>Overtone names this rather than routing around it."]:::note
+
+    classDef input  fill:#4f46e5,stroke:#312e81,stroke-width:2px,color:#ffffff
+    classDef gate   fill:#0f172a,stroke:#000000,stroke-width:2px,color:#ffffff
+    classDef work   fill:#0d9488,stroke:#134e4a,stroke-width:2px,color:#ffffff
+    classDef refuse fill:#b45309,stroke:#78350f,stroke-width:3px,color:#ffffff
+    classDef bad    fill:#be123c,stroke:#881337,stroke-width:2px,color:#ffffff
+    classDef good   fill:#15803d,stroke:#14532d,stroke-width:2px,color:#ffffff
+    classDef tension fill:#7e22ce,stroke:#581c87,stroke-width:2px,color:#ffffff
+    classDef note   fill:#334155,stroke:#0f172a,stroke-width:2px,color:#ffffff
+```
+
+Read the amber box as the product feature it is. `predict` refuses because `Var[dC] ~ 1/dim(g)`
+is a theorem with hypotheses, and Diaz et al. ([arXiv:2310.11505](https://arxiv.org/abs/2310.11505))
+exhibit polynomial-`dim(g)` circuits that plateau anyway. There is a gate line asserting the
+refusal still happens, so it cannot rot into an answer.
+
+---
+
 ## The result, in one table
 
 `SpectralControl-k` is a contextual bandit with reward `r(s, a) = (2a - 1) cos(k s)`. Its
@@ -131,6 +174,42 @@ computed there by the same Rust engine the tests run against, compiled to WebAss
 no pre-recorded traces, no cached results. The hero is a live `SpectralControl-3` agent with
 trainable input scaling, and you watch its single spectral peak slide up the frequency axis
 and lock onto the environment at `λ = 3.007`.
+
+Nothing on that page is fetched from a server, because there is no server. The diagram below
+is the whole runtime, and the dashed box is the part that does not exist:
+
+```mermaid
+flowchart LR
+    subgraph browser["the reader's browser — the entire runtime"]
+        direction TB
+        JS["<b>JavaScript renderer</b><br/>1186 lines of a 1200 budget<br/>draws, never computes"]:::js
+        W["<b>overtone_wasm_bg.wasm</b><br/>358 KiB<br/>the same Rust the tests run against"]:::wasm
+        JS <-->|"already fitted,<br/>already normalised"| W
+    end
+
+    subgraph absent["the backend"]
+        direction TB
+        X["no API · no queue · no database<br/>no inference endpoint · no state"]:::absent
+    end
+
+    CDN["Hugging Face <b>Static Space</b><br/>+ GitHub Pages mirror<br/><i>serves bytes, runs nothing</i>"]:::host
+    CDN -->|"one GET,<br/>then offline-capable"| browser
+    browser -.->|"never"| absent
+
+    classDef js     fill:#b45309,stroke:#78350f,stroke-width:2px,color:#ffffff
+    classDef wasm   fill:#4f46e5,stroke:#312e81,stroke-width:2px,color:#ffffff
+    classDef host   fill:#0d9488,stroke:#134e4a,stroke-width:2px,color:#ffffff
+    classDef absent fill:#1e293b,stroke:#64748b,stroke-width:2px,color:#94a3b8,stroke-dasharray: 6 4
+    style browser fill:#0f172a,stroke:#4f46e5,stroke-width:3px,color:#e2e8f0
+    style absent  fill:#0b1220,stroke:#475569,stroke-width:2px,color:#94a3b8,stroke-dasharray: 8 6
+```
+
+That is not an architecture choice made to fit a free tier — the arrow was already one-way
+before deployment was considered. `scripts/wasm_determinism.sh` requires native and WASM to
+agree to `1e-13`, and `scripts/check_js_budget.sh` forbids a panel from computing a physical
+quantity. Between them the frontend **is** the engine, so a backend would have nothing to do,
+and adding one would move logic out of Rust — which is the thing the budget exists to prevent.
+
 
 ```
 wasm-pack build crates/overtone-wasm --target web --out-dir pkg --release
@@ -835,6 +914,85 @@ instruction to solve it numerically is well taken.
   builds for `wasm32`. The ceiling is drawn behind the learning curve in the browser, so it
   cannot be a native-only convenience.
 
+## The workflow
+
+Overtone is built from a written specification — twelve Parts and six Decisions rulings in
+[`docs/spec/`](docs/spec/) — and the loop below is the whole process. The edge that makes it
+unusual is the red one: **when a measurement contradicts the specification, the specification
+is corrected**, in a dated table at the top of the Part, rather than the measurement being
+quietly dropped.
+
+```mermaid
+flowchart TD
+    SPEC["<b>docs/spec/</b><br/>Parts I–XI + six Decisions rulings"]:::spec
+    PH["<b>docs/PHASES.md</b><br/>the phase, its milestones, its exit criteria"]:::plan
+    IMPL["<b>implement</b> in the crate that owns it<br/><i>never in the wasm shim</i>"]:::code
+    GATE["<b>scripts/gate.sh</b><br/>92 checks — every README claim<br/>paired with an assertion"]:::gate
+    RES{"does it hold?"}:::q
+    FIX["fix the code"]:::code
+    CORR["<b>correct the spec</b><br/>dated correction table:<br/>Section │ Status │ See"]:::corr
+    PUB["<b>publish the result</b><br/>including the negative ones"]:::pub
+    CI["<b>CI</b> — rust · browser · yao oracle"]:::ci
+
+    SPEC --> PH --> IMPL --> GATE --> RES
+    RES -->|"the code is wrong"| FIX --> IMPL
+    RES -->|"the spec is wrong"| CORR
+    CORR -.->|"amends"| SPEC
+    RES -->|"it holds"| PUB --> CI
+
+    linkStyle 6 stroke:#dc2626,stroke-width:3px
+    linkStyle 7 stroke:#dc2626,stroke-width:3px
+
+    classDef spec fill:#4f46e5,stroke:#312e81,stroke-width:2px,color:#ffffff
+    classDef plan fill:#0369a1,stroke:#0c4a6e,stroke-width:2px,color:#ffffff
+    classDef code fill:#0d9488,stroke:#134e4a,stroke-width:2px,color:#ffffff
+    classDef gate fill:#b45309,stroke:#78350f,stroke-width:2px,color:#ffffff
+    classDef q    fill:#0f172a,stroke:#000000,stroke-width:2px,color:#ffffff
+    classDef corr fill:#be123c,stroke:#881337,stroke-width:3px,color:#ffffff
+    classDef pub  fill:#15803d,stroke:#14532d,stroke-width:2px,color:#ffffff
+    classDef ci   fill:#7e22ce,stroke:#581c87,stroke-width:2px,color:#ffffff
+```
+
+Three claims that were in the README and are not any more went out through the red edge. The
+rule they cost is written at the top of `CLAUDE.md`: *a quantity measured only where a game
+begins will look like whatever beginnings look like.*
+
+### What happens on a push
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Dev as push to main
+    participant CI as ci.yml
+    participant Pg as pages.yml
+    participant Sp as space.yml
+    participant HF as Hugging Face<br/>Static Space
+
+    Dev->>CI: rust · browser · yao oracle
+    activate CI
+    CI->>CI: fmt · clippy -D warnings · 249 tests
+    CI->>CI: build for wasm32 (5 crates)
+    CI->>CI: check_js_budget.sh — the renderer computes nothing
+    CI->>CI: wasm_determinism.sh — native vs wasm agree to 1e-13
+    CI->>CI: gradients match Yao.jl to 1e-12
+    deactivate CI
+    CI-->>Dev: green
+
+    par mirrored to two hosts, same bytes
+        Dev->>Pg: build_space.sh → GitHub Pages
+    and
+        Dev->>Sp: build_space.sh → dist/
+        Note over Sp: skipped unless vars.HF_SPACE is set
+        Sp->>HF: git push --force (the repo is regenerated each deploy)
+    end
+    HF-->>Dev: 539 KiB served, 358 KiB of it wasm
+```
+
+Neither host is a single point of failure, and the bundle refuses to build unless every
+`href`, `src` and relative JS import resolves inside it — verified by breaking it on purpose,
+removing `js/sound.js` and the wasm, and confirming both are caught.
+
+
 ## Building
 
 ```
@@ -869,11 +1027,36 @@ crates/overtone-graph/  maze Laplacian, eigenbasis, LMDP, eigenoptions (Phase 8)
 crates/overtone-opt/    shot budgets, four optimisers, the flatline   (Phase 8)
 crates/overtone-orbit/  Orbit: checkmate, the ladder, the endgame      (Phase 9)
 crates/overtone-cgt/    thermography, temperature, decomposition     (Phase 12)
+crates/overtone-otn/    the .otn notation and the Overtone-100 benchmark (Phase 13)
 crates/overtone-cli/    native trainer, predict, dequantize
 crates/overtone-wasm/   wasm-bindgen surface                       (Phase 4)
 lab/                    Yao.jl oracle and heavy sweeps
 docs/spec/              the build specification, Parts I to IX and VI-A
 ```
+
+Sixteen crates, **47 internal dependency edges, and not one of them points upward.** The tiers
+below are computed from the `Cargo.toml` files rather than asserted — every arrow crosses from
+a lower tier to a higher one, which is what makes the rule checkable instead of aspirational:
+
+```mermaid
+flowchart TD
+    T0["<b>tier 0</b> · depends on nothing of ours<br/><b>overtone-sim</b> state vector, gates, adjoint + parameter-shift gradients<br/><b>overtone-wfc</b> Wave Function Collapse, which is not physics · <b>overtone-cgt</b> thermography"]:::t0
+    T1["<b>tier 1</b><br/><b>overtone-rl</b> ansatz, policies, REINFORCE, the LP ceiling<br/><b>overtone-lie</b> Pauli bitsets, Lie closure, the prediction · <b>overtone-walk</b> quantum walks, transport"]:::t1
+    T2["<b>tier 2</b><br/><b>overtone-spec</b> FFT, spectrum, entropy, QFIM · <b>overtone-mps</b> bond spectra, the dequantization test<br/><b>overtone-gsim</b> Lie-algebraic simulation and gradients"]:::t2
+    T3["<b>tier 3</b><br/><b>overtone-graph</b> maze Laplacian, LMDP, eigenoptions · <b>overtone-opt</b> shot budgets, the flatline<br/><b>overtone-qd</b> MAP-Elites archive · <b>overtone-cli</b> train, predict, dequantize"]:::t3
+    T4["<b>tier 4</b><br/><b>overtone-orbit</b> the game: checkmate, the ladder, the endgame, the memo, the Skill Trace<br/><b>overtone-wasm</b> a shim — if it ever contains an <i>if</i> about physics, that logic is in the wrong crate"]:::t4
+    T5["<b>tier 5</b><br/><b>overtone-otn</b> the .otn notation and the Overtone-100 benchmark"]:::t5
+
+    T0 ==> T1 ==> T2 ==> T3 ==> T4 ==> T5
+
+    classDef t0 fill:#0f172a,stroke:#38bdf8,stroke-width:3px,color:#e0f2fe
+    classDef t1 fill:#4f46e5,stroke:#312e81,stroke-width:3px,color:#ffffff
+    classDef t2 fill:#0d9488,stroke:#134e4a,stroke-width:3px,color:#ffffff
+    classDef t3 fill:#15803d,stroke:#14532d,stroke-width:3px,color:#ffffff
+    classDef t4 fill:#b45309,stroke:#78350f,stroke-width:3px,color:#ffffff
+    classDef t5 fill:#7e22ce,stroke:#581c87,stroke-width:3px,color:#ffffff
+```
+
 
 The dependency direction is one-way and load-bearing. `overtone-sim` knows nothing about
 reinforcement learning; `overtone-rl` knows nothing about rendering; `overtone-wasm` is a

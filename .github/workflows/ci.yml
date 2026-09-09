@@ -112,6 +112,15 @@ jobs:
       - name: Native versus wasm agreement
         run: ./scripts/wasm_determinism.sh
 
+      # A mermaid block with a syntax error renders on GitHub as a grey error box, and the
+      # only way to find that out is to push. `graph`, `end`, `class`, `style` and `subgraph`
+      # are reserved words, so a node id taken from a crate name is a parse error. Chrome and
+      # node are already on this job for the smoke test, so the check is nearly free here.
+      - name: The README's diagrams parse, and carry no emoji
+        run: |
+          npm i -g @mermaid-js/mermaid-cli >/dev/null 2>&1
+          ./scripts/check_mermaid.sh
+
       - name: Build the page
         run: |
           wasm-pack build crates/overtone-wasm --target web --out-dir pkg --release
