@@ -4,10 +4,11 @@
 
 use std::time::Instant;
 
+use overtone_orbit::coldness::HOT_FLOOR;
 use overtone_orbit::ladder::ANGLES;
 use overtone_orbit::language::{Agent, Feature, LANGUAGE_V1, VERSION};
 use overtone_orbit::search::{candidates, choose, choose_with_stats, play};
-use overtone_orbit::thermal::{ambient_temperature, regions, temperature_field};
+use overtone_orbit::thermal::{region_options, regions, temperature_field};
 use overtone_orbit::work;
 use rand::SeedableRng;
 use rand_chacha::ChaCha8Rng;
@@ -122,40 +123,59 @@ fn main() {
 
     println!("\n\nThe heuristic the bias is built on, measured\n");
     let rs = regions(N, 3);
-    let mut rng = ChaCha8Rng::seed_from_u64(2);
-    let mut game = overtone_orbit::ladder::opening(N, COHERENCE, K, &mut rng);
-    let strategy = overtone_orbit::ladder::Strategy { budget: 6 };
-    let mut ch = ChaCha8Rng::seed_from_u64(9);
-    for ply in 0..5 {
-        let field = temperature_field(&game, &rs, &ANGLES);
-        println!("  ply {ply}: temperature field = {field:?}");
-        let (mv, ang) = strategy.choose(&game, &mut ch);
-        game.apply(&mv, ang);
-    }
-    let warm = candidates(&agents[0], N)
-        .iter()
-        .filter(|(mv, ang)| {
-            let mut t = game.clone();
-            t.apply(mv, *ang);
-            ambient_temperature(&t, &rs, &ANGLES) > -1.0
-        })
-        .count();
     println!(
-        "  {warm} of {} candidates raise a region above -1 from here",
-        candidates(&agents[0], N).len()
+        "{:>5}  {:>28}  hot across 8 seeds",
+        "ply", "field, one seed"
     );
+    for ply in 0..12 {
+        if ply % 2 == 0 {
+            let mut rng = ChaCha8Rng::seed_from_u64(2);
+            let mut game = overtone_orbit::ladder::opening(N, COHERENCE, K, &mut rng);
+            let strategy = overtone_orbit::ladder::Strategy { budget: 6 };
+            let mut ch = ChaCha8Rng::seed_from_u64(9);
+            for _ in 0..ply {
+                let (mv, ang) = strategy.choose(&game, &mut ch);
+                game.apply(&mv, ang);
+            }
+            let field = temperature_field(&game, &rs, &ANGLES);
+
+            let (mut hot, mut total) = (0usize, 0usize);
+            for seed in 0..8u64 {
+                let mut r = ChaCha8Rng::seed_from_u64(100 + seed);
+                let mut g = overtone_orbit::ladder::opening(N, COHERENCE, K, &mut r);
+                let st = overtone_orbit::ladder::Strategy { budget: 6 };
+                let mut c = ChaCha8Rng::seed_from_u64(900 + seed);
+                for _ in 0..ply {
+                    let (mv, ang) = st.choose(&g, &mut c);
+                    g.apply(&mv, ang);
+                }
+                for r in &rs {
+                    if let Some((l, rr)) = region_options(&g, r, &ANGLES) {
+                        total += 1;
+                        if l - rr > HOT_FLOOR {
+                            hot += 1;
+                        }
+                    }
+                }
+            }
+            println!(
+                "{ply:>5}  {:>28}  {:>18.2}",
+                format!("{field:?}"),
+                hot as f64 / total.max(1) as f64
+            );
+        }
+    }
     println!(
-        "\nThe field is uniformly -1 -- every region is a *number*, which is the CGT convention\n\
-         for cold -- and about a tenth of the moves lift one region to 0. So temperature here is a\n\
-         near-binary `this move heats a region` indicator rather than a graded urgency field,\n\
-         and the sibling spread of 1.207 that freeze.rs measured is one outlier in twenty-four\n\
-         divided by a mean sitting at -1.\n\
+        "\nThe opening is cold -- every region is a *number*, the CGT convention for a position\n\
+         neither player wants to move in -- and the game heats up as it develops. That is what a\n\
+         temperature is for, and examples/coldness.rs measures the curve: 0% of regions hot at\n\
+         ply 0, 46% by ply 6, 75% by ply 9 at n = 4.\n\
          \n\
-         That is a finding, not a defect, and Decisions-05 §2 already hedges it: the default\n\
-         weight is 0.15 precisely because nobody yet knows whether this is CGT temperature\n\
-         proper or something temperature-shaped. A constant heuristic adds a constant to every\n\
-         child and reorders nothing, so on a flat field the bias is inert by construction --\n\
-         which is the correct behaviour and is asserted as such in tests/search.rs."
+         An earlier version of this panel reported the field as uniformly -1 and concluded the\n\
+         heuristic was near-binary. It had sampled five plies of one seed, which is exactly the\n\
+         cold phase. That conclusion was wrong, and so was the correction it prompted to Phase\n\
+         12's sibling spread of 1.207 -- freeze.rs walks four plies in, so it sits in the same\n\
+         phase, and the 1.207 stands as originally reported."
     );
 
     println!(

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The gate. Every claim in the README has a line here that fails when it stops being true.
 #
-# Run from the repository root. Phases 1-15.
+# Run from the repository root. Phases 1-16.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
@@ -33,7 +33,7 @@ expect() {
   fi
 }
 
-echo "PHASE 1-15 GATE"
+echo "PHASE 1-16 GATE"
 
 run "cargo fmt --check"                cargo fmt --all -- --check
 run "clippy -D warnings"               cargo clippy --workspace --all-targets -- -D warnings
@@ -288,8 +288,8 @@ expect "progressive widening holds the root to sqrt(N)" \
   '^ +kestrel +512 +513 +23 +1[0-9][0-9] +[0-9]+ +' \
   cargo run --release -q -p overtone-orbit --example agents
 
-expect "the temperature field is flat where it runs" \
-  '^ +ply 0: temperature field = \[-1\.0, -1\.0, -1\.0\]' \
+expect "the opening is cold, and only the opening" \
+  '^ +0 +\[-1\.0, -1\.0, -1\.0\] +0\.00' \
   cargo run --release -q -p overtone-orbit --example agents
 
 expect "budget is a compute axis for all three kinds" \
@@ -303,6 +303,19 @@ expect "the language digest is pinned" \
 expect "presentation constants cannot change a result" \
   'test result: ok\. 3 passed' \
   cargo test --release -q -p overtone-orbit --test presentation
+
+# Phase 16 acceptance. Decisions-06 Q16, Q17.
+expect "the game heats up, it is not cold" \
+  '^  4   0\.00  0\.04  0\.04  0\.21  0\.21  0\.33  0\.46  0\.62  0\.67  0\.75' \
+  cargo run --release -q -p overtone-orbit --example coldness
+
+expect "the hot floor kills the dust at n>=6" \
+  '^  6       2        36      0\.0%' \
+  cargo run --release -q -p overtone-orbit --example coldness
+
+expect "the standing score dies at n=6, not n=5" \
+  '^  5         7\.617e-2         1\.016e-1' \
+  cargo run --release -q -p overtone-orbit --example coldness
 
 echo
 echo "  passed=$passed failed=$failed"

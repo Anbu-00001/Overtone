@@ -28,6 +28,7 @@
 
 pub mod advantage;
 pub mod checkmate;
+pub mod coldness;
 pub mod dial;
 pub mod endgame;
 pub mod game;

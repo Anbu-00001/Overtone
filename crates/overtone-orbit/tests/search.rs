@@ -190,36 +190,59 @@ fn a_measure_move_becomes_a_chance_node_with_two_outcomes() {
 }
 
 #[test]
-fn the_temperature_field_is_flat_where_the_ladder_runs() {
-    // Measured, and it matters more than it looks. Decisions-05 builds the whole progressive
-    // bias mechanism on temperature being a useful ordering heuristic, and at the widths the
-    // ladder actually runs at the field is **uniformly -1** in the opening -- every region is a
-    // number, which is the CGT convention for "cold". A few plies in, roughly one sibling move
-    // in twenty-four lifts a region to 0.
+fn the_opening_is_cold_and_the_middlegame_is_not() {
+    // The correction that matters most in this file. An earlier version of this test was named
+    // `the_temperature_field_is_flat_where_the_ladder_runs` and asserted the field was
+    // uniformly -1 -- which is true of the opening and false of the game. Five plies of one
+    // seed is exactly the cold phase, and a quantity measured only where a game begins will
+    // look like whatever beginnings look like.
     //
-    // So temperature here is a near-binary "this move makes a region hot" indicator, not a
-    // graded urgency field, and the sibling spread of 1.207 that `freeze.rs` measured is that
-    // one outlier divided by a mean sitting at -1. Decisions-05 §2 hedges exactly this by
-    // setting the default weight to 0.15; this is the measurement behind the hedge.
-    let g = opening();
+    // Measured across seeds: 0% of regions hot at ply 0, 46% by ply 6, 75% by ply 9 at n = 4.
     let rs = overtone_orbit::thermal::regions(N, 3);
-    let field =
-        overtone_orbit::thermal::temperature_field(&g, &rs, &overtone_orbit::ladder::ANGLES);
+    let a = overtone_orbit::ladder::ANGLES;
+
+    let field = overtone_orbit::thermal::temperature_field(&opening(), &rs, &a);
     assert!(
         field.iter().all(|t| *t == -1.0),
-        "the opening field is no longer flat: {field:?} -- update the note in search.rs"
+        "the opening should be cold: {field:?}"
+    );
+
+    let mut hot = 0;
+    let mut total = 0;
+    for seed in 0..6u64 {
+        let mut rng = ChaCha8Rng::seed_from_u64(100 + seed);
+        let mut game = overtone_orbit::ladder::opening(N, 24, 2, &mut rng);
+        let strategy = overtone_orbit::ladder::Strategy { budget: 6 };
+        let mut ch = ChaCha8Rng::seed_from_u64(900 + seed);
+        for _ in 0..9 {
+            let (mv, ang) = strategy.choose(&game, &mut ch);
+            game.apply(&mv, ang);
+        }
+        for r in &rs {
+            if let Some((l, rr)) = overtone_orbit::thermal::region_options(&game, r, &a) {
+                total += 1;
+                if l - rr > overtone_orbit::coldness::HOT_FLOOR {
+                    hot += 1;
+                }
+            }
+        }
+    }
+    assert!(
+        hot * 2 > total,
+        "by ply 9 most regions should be hot, got {hot} of {total}"
     );
 }
 
 #[test]
-fn the_bias_weight_is_inert_on_a_flat_field_and_that_is_not_a_bug() {
+fn the_bias_weight_is_inert_at_the_opening_and_that_is_not_a_bug() {
     // A constant heuristic adds a constant to every child's UCT score, so it cannot reorder
-    // anything. With the field flat at the opening, `temperature_bias` changes nothing there --
-    // and asserting that it *did* would be asserting that a constant offset breaks ties, which
-    // would mean something else was wrong.
+    // anything. The opening is cold at every region, so `temperature_bias` changes nothing
+    // *there* -- and asserting that it did would be asserting that a constant offset breaks
+    // ties, which would mean something else was wrong.
     //
-    // What the weight must not be is unable to matter anywhere; `the_bias_reorders_expansion`
-    // is that half of the claim.
+    // This is a statement about the opening, not about the game. By ply 9 most regions are hot
+    // and the weight has something to bias with; `the_opening_is_cold_and_the_middlegame_is_not`
+    // is the other half of the claim.
     let hot = Agent::parse(KESTREL).unwrap();
     let off = Agent::parse(&KESTREL.replace("temperature_bias = 0.15", "temperature_bias = 0.0"))
         .unwrap();
@@ -233,7 +256,7 @@ fn the_bias_weight_is_inert_on_a_flat_field_and_that_is_not_a_bug() {
 }
 
 #[test]
-fn the_bias_reorders_expansion_once_the_field_is_not_flat() {
+fn the_heuristic_has_signal_where_the_game_is_played() {
     // Construct the case the heuristic exists for: a position where one region is warmer than
     // the others, and check that the warm move is expanded before the cold ones. This is
     // Decisions-05 §3's second job for temperature -- expansion ordering under widening -- and
