@@ -31,6 +31,7 @@
 
 use overtone_lie::{closure, Algebra, PauliString};
 use overtone_sim::{Pauli, StateVec};
+use rand::Rng;
 
 use crate::checkmate::{apply_exponential, Position};
 
@@ -234,6 +235,21 @@ impl Game {
     /// time. `k` is Part VI's coherence budget and is the physical parameter that
     /// interpolates between one decision per step and few decisions over long evolutions.
     pub fn apply(&mut self, mv: &Move, angle: f64) {
+        self.step(mv, angle, 0.5);
+    }
+
+    /// Rule 3, with the measurement outcome drawn from the Born rule instead of assumed.
+    ///
+    /// Part IX 1.2: measurement is Born-random, and that is what makes Overtone a *stochastic*
+    /// game -- which is in turn why Decisions-01 Q1 makes MCTS the primary search, since
+    /// expectimax's chance nodes would be 1024-way at `n = 10`. [`Game::apply`] keeps the
+    /// deterministic collapse because the depth ladder compares strategies and collapse
+    /// variance is noise there. Which one a search uses is part of what an agent declares.
+    pub fn apply_stochastic<R: Rng>(&mut self, mv: &Move, angle: f64, rng: &mut R) {
+        self.step(mv, angle, rng.gen_range(0.0f64..1.0));
+    }
+
+    fn step(&mut self, mv: &Move, angle: f64, draw: f64) {
         let player = &mut self.players[self.to_move];
         match mv {
             Move::Apply { piece, targets } => {
@@ -245,7 +261,7 @@ impl Game {
                 player.coherence = player.coherence.saturating_sub(self.k);
             }
             Move::Measure { qubit } => {
-                collapse(&mut player.state, *qubit);
+                collapse_at(&mut player.state, *qubit, draw);
                 // Measuring costs the same `k` as applying a generator. An earlier comment
                 // here claimed it "costs the whole remaining coherence block" and cited Part
                 // VII 4 for it; the code never did that, and Part VI 2.2 does not ask for it
@@ -346,16 +362,36 @@ impl Game {
 /// to do with the strategies being compared. A stochastic version belongs in play, not in the
 /// measurement harness.
 pub fn collapse(psi: &mut StateVec, qubit: usize) {
+    collapse_at(psi, qubit, 0.5)
+}
+
+/// The Born probability that measuring `qubit` returns one.
+///
+/// A search that builds explicit chance nodes needs the branch weights, not just a sample:
+/// with two outcomes there is nothing to approximate, and sampling a node whose distribution
+/// you can write down exactly would be adding variance for no reason.
+pub fn one_weight(psi: &StateVec, qubit: usize) -> f64 {
+    let bit = 1usize << qubit;
+    (0..psi.dim())
+        .filter(|i| i & bit != 0)
+        .map(|i| {
+            let a = psi.amp(i);
+            a.re * a.re + a.im * a.im
+        })
+        .sum()
+}
+
+/// Projective measurement whose branch is decided by comparing the one-weight against `draw`.
+///
+/// One function covers both regimes, and the relationship between them is worth seeing: the
+/// branch is kept when `weight_one > draw`, so a uniform `draw` reproduces the Born rule
+/// exactly, and the deterministic collapse is the *median* draw, `0.5`. The measurement
+/// harness and play differ by one number rather than by one implementation.
+pub fn collapse_at(psi: &mut StateVec, qubit: usize, draw: f64) {
     let dim = psi.dim();
     let bit = 1usize << qubit;
-    let mut weight_one = 0.0;
-    for i in 0..dim {
-        if i & bit != 0 {
-            let a = psi.amp(i);
-            weight_one += a.re * a.re + a.im * a.im;
-        }
-    }
-    let keep_one = weight_one > 0.5;
+    let weight_one = one_weight(psi, qubit);
+    let keep_one = weight_one > draw;
     let norm = if keep_one {
         weight_one
     } else {

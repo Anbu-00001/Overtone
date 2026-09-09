@@ -1,0 +1,20 @@
+# A submission in agent language v1. The engine runs the search; this file is data.
+#
+# Validate with:  cargo run -q -p overtone-orbit --example agents
+
+language   = "v1"
+
+[agent]
+name       = "kestrel"
+generators = ["pawn", "rook", "bishop", "knight"]
+
+[agent.search]
+kind       = "mcts"
+budget     = 512
+rollout    = "tablebase"
+# W in the progressive-bias term W*H/(1+n). Decisions-05 §2: 0.15, not 0.7.
+temperature_bias = 0.15
+
+[agent.eval]
+features   = ["dim_g", "orbit_size", "safe_set_size", "half_chain_entropy"]
+weights    = [0.31, -0.12, 0.44, 0.08]

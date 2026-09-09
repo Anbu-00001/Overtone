@@ -33,7 +33,11 @@ pub mod endgame;
 pub mod game;
 pub mod invariant;
 pub mod ladder;
+pub mod language;
+pub mod presentation;
+pub mod search;
 pub mod thermal;
+pub mod work;
 
 pub use advantage::{dnd_advantage, dnd_disadvantage, Advantage};
 pub use dial::Complexity;

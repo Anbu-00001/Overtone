@@ -10,6 +10,7 @@ description = "The .otn notation: a frozen, versioned, self-verifying record of 
 [dependencies]
 overtone-orbit.workspace = true
 overtone-sim.workspace = true
+overtone-spec.workspace = true
 overtone-graph.workspace = true
 overtone-lie.workspace = true
 rand.workspace = true

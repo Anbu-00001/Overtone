@@ -1,0 +1,16 @@
+# Negamax searches against the deterministic collapse, which is a modelling error this agent
+# is choosing: measure moves really are Born-random. See LANGUAGE_V1.
+
+language   = "v1"
+
+[agent]
+name       = "pike"
+generators = ["pawn", "rook", "bishop", "knight"]
+
+[agent.search]
+kind       = "negamax"
+budget     = 256
+
+[agent.eval]
+features   = ["safe_set_size", "dim_g"]
+weights    = [1.0, 0.25]

@@ -6,6 +6,18 @@ You have finished Phase 3, so `overtone-sim`, `overtone-rl`, `overtone-spec` and
 
 ---
 
+## Corrections
+
+**The body below is unchanged**, per the convention in Part II. Corrections are recorded here
+and reasoned out in `docs/PHASES.md`.
+
+| Section | Correction | Source |
+|---|---|---|
+| §1 | "A fermionic agent walls off a corridor" is wrong. Pauli exclusion forbids two fermions in the same **mode**, not at the same **site**: a coined walk has a site *and* a coin, so two fermions share a site in opposite coin states (Sansoni Eq. 4). Measured in `overtone-walk::two`: fermionic mode diagonal exactly `0`, position diagonal `0.094`. A fermionic class blocks one coin state, not the corridor. | Decisions-03 §11; Phase 13 |
+| §1 citation | Decisions-02 §3 records the anyonic citation as contradicted on the grounds that Sansoni et al. name only bosons and fermions. That is what the *abstract* says. The body prepares anyonic states at `φ = π/4, π/2, 3π/4` and Fig. 4(c) plots `φ = π/2`, so the citation stands. The audit's substantive point survives: they simulate exchange with photon polarisation rather than making anyons, so van Exter et al. (PRA 85, 033823) is cited **alongside**, not instead. | Phase 13, on the primary source |
+
+---
+
 ## 0. Verdict on the pitch, stated plainly
 
 Your three ideas — agents fighting, being chased, consuming to grow — are **not dumb**. They identify a real gap: five parts in, Overtone has no stakes and no agency. A reader watches. Watching does not spread.

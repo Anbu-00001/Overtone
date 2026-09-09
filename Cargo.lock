@@ -264,6 +264,7 @@ dependencies = [
  "overtone-lie",
  "overtone-orbit",
  "overtone-sim",
+ "overtone-spec",
  "rand",
  "rand_chacha",
 ]

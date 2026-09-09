@@ -21,14 +21,11 @@ pub const HASH_QUANTUM: f64 = 1e-9;
 /// `std::collections::hash_map::DefaultHasher` is documented as not guaranteed stable across
 /// Rust releases. A format whose verification depends on it would silently stop verifying
 /// after an upgrade, which is the opposite of what Part VIII 1 asks for.
-pub fn fnv1a(bytes: &[u8]) -> u64 {
-    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
-    for &b in bytes {
-        h ^= b as u64;
-        h = h.wrapping_mul(0x0000_0100_0000_01b3);
-    }
-    h
-}
+///
+/// It moved down to `overtone-spec` when M41a needed the same bytes: the agent language lives
+/// in `overtone-orbit`, which this crate depends on, so it could not reach an implementation
+/// here without a cycle. Two copies of one guarantee is one copy too many.
+pub use overtone_spec::digest::fnv1a;
 
 /// Quantise one amplitude component onto the hash grid.
 fn quantise(x: f64) -> i64 {

@@ -1,0 +1,16 @@
+# The cheapest agent the language can express: one ply, one feature, no search.
+# It is the floor of the ladder and it exists to be beaten.
+
+language   = "v1"
+
+[agent]
+name       = "stoat"
+generators = ["pawn"]
+
+[agent.search]
+kind       = "greedy"
+budget     = 32
+
+[agent.eval]
+features   = ["safe_set_size"]
+weights    = [1.0]

@@ -43,6 +43,20 @@ pub struct Region {
 
 impl Region {
     /// Does every target of this move lie inside the region?
+    /// Does this move act on any qubit in the region?
+    ///
+    /// [`Region::contains_move`] is the decomposition's question -- a game decomposes only if
+    /// each summand's moves stay inside it. This is the *ordering* question, which is
+    /// different: a move spanning two regions still acts on the hot one, and a search that
+    /// scored it zero because it fits in neither would systematically avoid exactly the moves
+    /// that couple the summands.
+    pub fn touches_move(&self, mv: &Move) -> bool {
+        match mv {
+            Move::Apply { targets, .. } => targets.iter().any(|t| self.qubits.contains(t)),
+            Move::Measure { qubit } => self.qubits.contains(qubit),
+        }
+    }
+
     pub fn contains_move(&self, mv: &Move) -> bool {
         match mv {
             Move::Apply { targets, .. } => targets.iter().all(|t| self.qubits.contains(t)),

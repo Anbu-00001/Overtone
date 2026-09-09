@@ -13,6 +13,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod digest;
 pub mod entropy;
 pub mod fft;
 pub mod plateau;
@@ -20,6 +21,7 @@ pub mod qfim;
 pub mod spectrum;
 pub mod stats;
 
+pub use digest::fnv1a;
 pub use entropy::{bipartition, half_chain_entropy, Bipartition};
 pub use plateau::{
     fit_exponential, sweep, CostLocality, DepthPolicy, ExponentialFit, PlateauPoint,

@@ -1,0 +1,22 @@
+# Presentation constants. Decisions-01 Q4's operational test decides what may live here:
+#
+#   > A number is invented if changing it changes an outcome.
+#
+# Every constant in this file must be able to change *how something is shown or accepted* and
+# must never be able to change a match result, a measurement, or a claim. `scripts/gate.sh`
+# runs a test that perturbs each one and asserts that match results are unchanged, so the
+# boundary is enforced mechanically rather than by discipline. If someone later hides a
+# mechanic in here, that test fails.
+#
+# It is deliberately short. Most numbers in this repository are measured or derived, and the
+# value of the file is not its length -- it is that the first mechanic anyone tries to smuggle
+# in has somewhere to be caught.
+
+[league]
+# Decimal places the L2-normalised weight vector is rounded to before the submission
+# uniqueness check. Decides whether a pull request is accepted as a distinct agent; never
+# reaches execution, which uses the unrounded vector.
+dedup_precision = 6
+
+# Rows shown on LEADERBOARD.md. A display cut, not a tournament cut.
+leaderboard_rows = 25
