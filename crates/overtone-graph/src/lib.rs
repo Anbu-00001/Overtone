@@ -1,3 +1,8 @@
+// Overtone. Copyright (C) 2026 Anbuchelvan Ganesan.
+// Licensed under the GNU Affero General Public License, version 3 or (at your option) any
+// later version. See LICENSE, or <https://www.gnu.org/licenses/>. This program is
+// distributed WITHOUT ANY WARRANTY; see the licence for details.
+
 //! The maze's Laplacian, and the two things that fall out of diagonalising it.
 //!
 //! Part V 1.1 is the unification the series was missing. Proto-value functions (Mahadevan,

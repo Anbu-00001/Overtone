@@ -306,6 +306,15 @@ property of the state. WFC has no phase, so nothing in it can ever interfere.
 | Region decomposition does not leak | 8 seeds | `0.0000` | `overtone-orbit/tests/thermal.rs` |
 | The two temperatures do not track | partial `rho = -0.021` | `< 0.25` | `overtone-orbit/examples/twotemps.rs` |
 | A 32x32 temperature field fits a frame | `5.6%` of 16.7 ms | `< 100%` | `overtone-cgt/examples/heatmap.rs` |
+| Pauli exclusion is exact in the mode basis | identically 0 | exact | `overtone-walk/tests/statistics.rs` |
+| ...and absent in the position basis | `0.09375` | measured | `overtone-walk/tests/statistics.rs` |
+| The anyonic phase interpolates monotonically | 5 values of `phi` | strict | `overtone-walk/tests/statistics.rs` |
+| Adjacent walkers cannot interfere at all | similarity `1.000` | exact | `overtone-walk/tests/statistics.rs` |
+| `.otn` export format is byte-exact | a fixed point | exact | `overtone-otn/tests/roundtrip.rs` |
+| A future format version is refused, not guessed | both tags | exact | `overtone-otn/tests/roundtrip.rs` |
+| A whole game fits a few hundred bytes | 60 plies | `< 900 B` | `overtone-otn/tests/roundtrip.rs` |
+| Overtone-100 answers are independently re-derived | `100/100` | exact | `overtone-otn/tests/hundred.rs` |
+| No benchmark category can be guessed | `15/15` split | skew `< 0.34` | `overtone-otn/tests/hundred.rs` |
 | JavaScript stays a renderer | 1186 lines | 1200 | `scripts/check_js_budget.sh` |
 
 206 integration tests, 249 with unit and doc tests. Every number in the measured column is
@@ -814,4 +823,17 @@ crate.
 
 ## Licence
 
-Apache-2.0.
+**AGPL-3.0-or-later.** Copyright (C) 2026 Anbuchelvan Ganesan. Full text in [`LICENSE`](LICENSE);
+the reasoning is in [`NOTICE`](NOTICE).
+
+The clause that does the work is section 13. Running a modified Overtone as a network
+service counts as conveying it, so a hosted fork owes its source to the people using it —
+not only to whoever downloads a tarball. That is deliberate: this is an instrument, its
+value is that its measurements can be checked, and a closed hosted variant whose numbers
+nobody could audit would defeat the point.
+
+Using Overtone unmodified, or running it privately, obliges you to nothing. Publishing a
+modified version — by distribution or over a network — obliges you to publish that
+version's source under the same licence.
+
+Earlier commits were published under Apache-2.0 and that grant stands for those versions.

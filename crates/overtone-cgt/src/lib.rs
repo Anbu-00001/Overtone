@@ -1,3 +1,8 @@
+// Overtone. Copyright (C) 2026 Anbuchelvan Ganesan.
+// Licensed under the GNU Affero General Public License, version 3 or (at your option) any
+// later version. See LICENSE, or <https://www.gnu.org/licenses/>. This program is
+// distributed WITHOUT ANY WARRANTY; see the licence for details.
+
 //! Temperature: move ordering that nobody tuned.
 //!
 //! Part IX 5.2 states the problem this crate exists to solve. Part VII forbids invented

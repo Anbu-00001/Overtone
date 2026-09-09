@@ -5,7 +5,7 @@ colorTo: gray
 sdk: static
 app_file: index.html
 pinned: false
-license: apache-2.0
+license: agpl-3.0
 ---
 
 # Overtone

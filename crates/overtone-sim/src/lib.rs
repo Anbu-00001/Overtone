@@ -1,3 +1,8 @@
+// Overtone. Copyright (C) 2026 Anbuchelvan Ganesan.
+// Licensed under the GNU Affero General Public License, version 3 or (at your option) any
+// later version. See LICENSE, or <https://www.gnu.org/licenses/>. This program is
+// distributed WITHOUT ANY WARRANTY; see the licence for details.
+
 //! Overtone's state-vector simulator.
 //!
 //! A variational quantum circuit that encodes classical data is exactly a truncated

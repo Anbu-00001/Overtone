@@ -1,3 +1,8 @@
+// Overtone. Copyright (C) 2026 Anbuchelvan Ganesan.
+// Licensed under the GNU Affero General Public License, version 3 or (at your option) any
+// later version. See LICENSE, or <https://www.gnu.org/licenses/>. This program is
+// distributed WITHOUT ANY WARRANTY; see the licence for details.
+
 //! Optimisers, shot budgets, and the barren-plateau flatline (Part V 4, 5.2).
 //!
 //! Part V asks for two things that turn out to be one thing. Section 5.2 wants four

@@ -1,3 +1,8 @@
+// Overtone. Copyright (C) 2026 Anbuchelvan Ganesan.
+// Licensed under the GNU Affero General Public License, version 3 or (at your option) any
+// later version. See LICENSE, or <https://www.gnu.org/licenses/>. This program is
+// distributed WITHOUT ANY WARRANTY; see the licence for details.
+
 //! Engine B, and the instrument that tries to disprove the project's own premise.
 //!
 //! Part III 5: if a `chi = 4` tensor network reproduces a quantum agent, the quantum agent

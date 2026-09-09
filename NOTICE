@@ -1,0 +1,30 @@
+Overtone — a quantum reinforcement-learning instrument.
+
+Copyright (C) 2026 Anbuchelvan Ganesan
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU Affero General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option) any
+later version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.  See the GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License along
+with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+--------------------------------------------------------------------------------
+
+Why the AGPL and not a permissive licence.
+
+Overtone is an instrument. Its value is that its measurements can be checked,
+and that property survives only if every version anyone runs stays open. The
+AGPL's section 13 is the clause that matters here: offering a modified Overtone
+to users over a network counts as conveying it, so a hosted fork owes its source
+to the people using it. A permissive licence would allow a closed hosted variant
+whose numbers nobody could audit, which would defeat the point of the project.
+
+Prior versions of this work were distributed under Apache-2.0. That grant is
+irrevocable for the versions it was made under; this change applies from the
+commit that introduced it onward.
