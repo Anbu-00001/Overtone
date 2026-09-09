@@ -39,6 +39,7 @@ use rand_chacha::ChaCha8Rng;
 use crate::game::{collapse_at, one_weight, Game, Move, Outcome};
 use crate::ladder::ANGLES;
 use crate::language::{Agent, Rollout, SearchKind};
+use crate::memo::Memo;
 use crate::thermal::{regions, temperature_field};
 
 /// UCT's exploration constant, valid because the eval is mapped into `[0, 1]` first.
@@ -87,6 +88,9 @@ pub struct SearchStats {
     pub chance_nodes: usize,
     /// Deepest path from the root, in nodes.
     pub depth: usize,
+    /// Algebraic-layer memo hits and misses over the search.
+    pub memo_hits: usize,
+    pub memo_misses: usize,
 }
 
 /// Run the agent's declared search and return the move it plays.
@@ -101,18 +105,19 @@ pub fn choose_with_stats(
     rng: &mut ChaCha8Rng,
 ) -> (Candidate, SearchStats) {
     match agent.search.kind {
-        SearchKind::Greedy => (greedy(agent, game, rng), SearchStats::default()),
-        SearchKind::Negamax => (negamax_root(agent, game), SearchStats::default()),
+        SearchKind::Greedy => greedy(agent, game, rng),
+        SearchKind::Negamax => negamax_root(agent, game, rng),
         SearchKind::Mcts => mcts(agent, game, rng),
     }
 }
 
 /// Depth-one search over as many candidates as the budget allows.
-fn greedy(agent: &Agent, game: &Game, rng: &mut ChaCha8Rng) -> Candidate {
+fn greedy(agent: &Agent, game: &Game, rng: &mut ChaCha8Rng) -> (Candidate, SearchStats) {
     let n = game.players[game.to_move].num_qubits;
     let cands = candidates(agent, n);
     let me = game.to_move;
     let mut best = (cands[0].clone(), f64::NEG_INFINITY);
+    let mut memo = Memo::new();
     let budget = agent.search.budget;
     // Below the candidate count the budget samples without replacement; at or above it the
     // whole set is searched, because sampling with replacement would only re-evaluate.
@@ -131,12 +136,19 @@ fn greedy(agent: &Agent, game: &Game, rng: &mut ChaCha8Rng) -> Candidate {
         let (mv, angle) = &cands[i];
         let mut trial = game.clone();
         trial.apply(mv, *angle);
-        let s = agent.eval.score(&trial, me);
+        let s = agent.eval.score_with(&trial, me, &mut memo);
         if s > best.1 {
             best = ((mv.clone(), *angle), s);
         }
     }
-    best.0
+    (
+        best.0,
+        SearchStats {
+            memo_hits: memo.hits(),
+            memo_misses: memo.misses(),
+            ..SearchStats::default()
+        },
+    )
 }
 
 /// Iteratively deepened alpha-beta, stopped by the node budget rather than by a fixed depth.
@@ -146,12 +158,24 @@ fn greedy(agent: &Agent, game: &Game, rng: &mut ChaCha8Rng) -> Candidate {
 /// would be naming different amounts of compute at different widths. The last *completed*
 /// iteration is the one whose move is played, which is the standard way to make a
 /// budget-limited search safe to interrupt.
-fn negamax_root(agent: &Agent, game: &Game) -> Candidate {
+fn negamax_root(agent: &Agent, game: &Game, rng: &mut ChaCha8Rng) -> (Candidate, SearchStats) {
     let n = game.players[game.to_move].num_qubits;
-    let cands = candidates(agent, n);
+    let mut cands = candidates(agent, n);
+    // Shuffle, for the same reason greedy samples without replacement rather than taking a
+    // prefix. Below the candidate count the node budget stops the root scan part-way, so an
+    // unshuffled list makes "budget b" mean "the best of the first b candidates in the order
+    // `legal_moves` happens to emit" -- an arbitrary family, and a non-monotone one. Measured
+    // before this fix: budget 6 beat budget 48 sixty games to nil, and budget 96 lost to budget
+    // 6 by the same margin. That is not a compute axis, it is an enumeration artefact.
+    let len = cands.len();
+    for i in (1..len).rev() {
+        cands.swap(i, rng.gen_range(0..=i));
+    }
+    let mut memo = Memo::new();
     let mut best = cands[0].clone();
     let budget = agent.search.budget;
     let mut depth = 1;
+    let mut completed = 0usize;
     loop {
         let mut nodes = 0usize;
         let mut alpha = f64::NEG_INFINITY;
@@ -173,6 +197,7 @@ fn negamax_root(agent: &Agent, game: &Game) -> Candidate {
                 -alpha,
                 &mut nodes,
                 budget,
+                &mut memo,
             );
             if v > alpha {
                 alpha = v;
@@ -186,7 +211,10 @@ fn negamax_root(agent: &Agent, game: &Game) -> Candidate {
         // version of this function did, and it made the compute axis flat for `kind =
         // "negamax"` at every budget under 240 -- visible only as two identical win rates.
         match this {
-            Some(m) => best = m,
+            Some(m) => {
+                best = m;
+                completed = depth;
+            }
             None => break,
         }
         if ran_out || nodes >= budget || depth >= horizon(game) {
@@ -194,9 +222,18 @@ fn negamax_root(agent: &Agent, game: &Game) -> Candidate {
         }
         depth += 1;
     }
-    best
+    (
+        best,
+        SearchStats {
+            memo_hits: memo.hits(),
+            memo_misses: memo.misses(),
+            depth: completed,
+            ..SearchStats::default()
+        },
+    )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn negamax(
     agent: &Agent,
     game: &Game,
@@ -205,12 +242,13 @@ fn negamax(
     beta: f64,
     nodes: &mut usize,
     budget: usize,
+    memo: &mut Memo,
 ) -> f64 {
     if depth == 0 || *nodes >= budget {
         // The eval is antisymmetric, so the value from the side to move is exactly what
         // negamax's sign convention wants. An eval scoring one side only would be wrong here
         // and would look right.
-        return agent.eval.score(game, game.to_move);
+        return agent.eval.score_with(game, game.to_move, memo);
     }
     let n = game.players[game.to_move].num_qubits;
     let mut best = f64::NEG_INFINITY;
@@ -221,7 +259,7 @@ fn negamax(
         *nodes += 1;
         let mut child = game.clone();
         child.apply(&mv, angle);
-        let v = -negamax(agent, &child, depth - 1, -beta, -alpha, nodes, budget);
+        let v = -negamax(agent, &child, depth - 1, -beta, -alpha, nodes, budget, memo);
         if v > best {
             best = v;
         }
@@ -233,7 +271,7 @@ fn negamax(
         }
     }
     if best == f64::NEG_INFINITY {
-        agent.eval.score(game, game.to_move)
+        agent.eval.score_with(game, game.to_move, memo)
     } else {
         best
     }
@@ -358,6 +396,7 @@ fn mcts(agent: &Agent, game: &Game, rng: &mut ChaCha8Rng) -> (Candidate, SearchS
     }
     order.sort_by(|&a, &b| h[b].partial_cmp(&h[a]).unwrap_or(std::cmp::Ordering::Equal));
 
+    let mut memo = Memo::new();
     let mut nodes = vec![Node {
         game: game.clone(),
         parent: None,
@@ -437,7 +476,7 @@ fn mcts(agent: &Agent, game: &Game, rng: &mut ChaCha8Rng) -> (Candidate, SearchS
             }
         }
 
-        let v = rollout(agent, &nodes[at].game, reference, cap, rng);
+        let v = rollout(agent, &nodes[at].game, reference, cap, rng, &mut memo);
         let mut cursor = Some(at);
         while let Some(i) = cursor {
             nodes[i].visits += 1.0;
@@ -460,6 +499,8 @@ fn mcts(agent: &Agent, game: &Game, rng: &mut ChaCha8Rng) -> (Candidate, SearchS
             .filter(|n| matches!(n.kind, Kind::Chance { .. }))
             .count(),
         depth: depth_of(&nodes),
+        memo_hits: memo.hits(),
+        memo_misses: memo.misses(),
     };
 
     // The most visited child, which is the standard robust choice: a high-value child visited
@@ -539,7 +580,14 @@ fn expand(nodes: &mut Vec<Node>, at: usize, ci: usize, cands: &[Candidate], move
 }
 
 /// Play out to the coherence horizon, then take the value the declared rollout asks for.
-fn rollout(agent: &Agent, from: &Game, reference: usize, cap: usize, rng: &mut ChaCha8Rng) -> f64 {
+fn rollout(
+    agent: &Agent,
+    from: &Game,
+    reference: usize,
+    cap: usize,
+    rng: &mut ChaCha8Rng,
+    memo: &mut Memo,
+) -> f64 {
     let n = from.players[from.to_move].num_qubits;
     let cands = candidates(agent, n);
     let mut g = from.clone();
@@ -563,9 +611,9 @@ fn rollout(agent: &Agent, from: &Game, reference: usize, cap: usize, rng: &mut C
                     1.0
                 }
             }
-            _ => agent.eval.uct_value(&g, reference),
+            _ => agent.eval.uct_value_with(&g, reference, memo),
         },
-        Rollout::Playout => agent.eval.uct_value(&g, reference),
+        Rollout::Playout => agent.eval.uct_value_with(&g, reference, memo),
     }
 }
 

@@ -153,6 +153,7 @@ impl Invariants {
 /// Precompute the commutant and the ideal decomposition with [`OrbitCertificate::new`] when
 /// they are needed more than once; both are properties of the algebra alone and neither
 /// depends on the state.
+#[derive(Clone, Debug)]
 pub struct OrbitCertificate {
     commutant: Vec<PauliString>,
     ideals: Vec<Vec<PauliString>>,

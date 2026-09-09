@@ -83,6 +83,7 @@ use overtone_spec::entropy::half_chain_entropy;
 
 use crate::game::{Game, Piece};
 use crate::invariant::orbit_dimension;
+use crate::memo::Memo;
 
 /// The frozen version of this language. A spec declaring anything else is rejected.
 pub const VERSION: &str = "v1";
@@ -180,11 +181,21 @@ impl Feature {
 /// them from separate calls would pay for it twice and is the obvious way to make a
 /// 5.27-microsecond evaluation cost 9.
 pub fn raw_features(game: &Game, player: usize) -> [f64; 4] {
+    raw_features_with(game, player, &mut Memo::new())
+}
+
+/// As [`raw_features`], reusing a caller-owned memo for the algebraic layer.
+///
+/// The Lie closure is the expensive term and it depends only on the hand, which changes at most
+/// once per ply while this runs once per node. See [`crate::memo`] for why the memo keys on the
+/// hand alone rather than on Q8's five-part key.
+pub fn raw_features_with(game: &Game, player: usize, memo: &mut Memo) -> [f64; 4] {
     let p = &game.players[player];
-    let algebra: Algebra = p.algebra();
+    let cached = memo.get(&p.hand, p.num_qubits);
+    let algebra: &Algebra = &cached.algebra;
     [
         algebra.dim() as f64,
-        orbit_dimension(&algebra, &p.state, TOLERANCE) as f64,
+        orbit_dimension(algebra, &p.state, TOLERANCE) as f64,
         game.safe_for(player).len() as f64,
         half_chain_entropy(&p.state),
     ]
@@ -355,7 +366,12 @@ pub struct Eval {
 impl Eval {
     /// Raw feature values, in the order the spec declared them.
     pub fn raw(&self, game: &Game, player: usize) -> Vec<f64> {
-        let all = raw_features(game, player);
+        self.raw_with(game, player, &mut Memo::new())
+    }
+
+    /// As [`Eval::raw`], reusing a caller-owned memo.
+    pub fn raw_with(&self, game: &Game, player: usize, memo: &mut Memo) -> Vec<f64> {
+        let all = raw_features_with(game, player, memo);
         self.features
             .iter()
             .map(|f| match f {
@@ -369,9 +385,14 @@ impl Eval {
 
     /// The antisymmetric score for `player`: their features minus their opponent's.
     pub fn score(&self, game: &Game, player: usize) -> f64 {
+        self.score_with(game, player, &mut Memo::new())
+    }
+
+    /// As [`Eval::score`], reusing a caller-owned memo.
+    pub fn score_with(&self, game: &Game, player: usize, memo: &mut Memo) -> f64 {
         let n = game.players[player].num_qubits;
-        let mine = self.raw(game, player);
-        let theirs = self.raw(game, player ^ 1);
+        let mine = self.raw_with(game, player, memo);
+        let theirs = self.raw_with(game, player ^ 1, memo);
         self.features
             .iter()
             .enumerate()
@@ -389,11 +410,16 @@ impl Eval {
     /// This is what makes weight scale behaviourally irrelevant, and it has to happen before
     /// L2-normalisation is honest.
     pub fn uct_value(&self, game: &Game, player: usize) -> f64 {
+        self.uct_value_with(game, player, &mut Memo::new())
+    }
+
+    /// As [`Eval::uct_value`], reusing a caller-owned memo.
+    pub fn uct_value_with(&self, game: &Game, player: usize, memo: &mut Memo) -> f64 {
         let l1 = self.l1();
         if l1 <= 0.0 {
             return 0.5;
         }
-        (0.5 + 0.5 * self.score(game, player) / l1).clamp(0.0, 1.0)
+        (0.5 + 0.5 * self.score_with(game, player, memo) / l1).clamp(0.0, 1.0)
     }
 }
 
