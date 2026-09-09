@@ -1614,32 +1614,43 @@ Five to eight times the search. So `H` is a property of the *move*, evaluated on
 position, and it is stale deeper in the tree — which is exactly the case progressive bias was
 chosen for.
 
-### And the heuristic is flatter than the freeze measurement suggested
+### The heuristic reading that was wrong, and the correction
 
-This is a correction to Phase 12's own reporting. `freeze.rs` measured `temperature` at a
-sibling spread of **1.207**, the largest of any candidate feature, and that number is real.
-What it is measuring is not.
+**This section previously reported the opposite of what is true, and the retraction is more
+useful than the claim was.**
+
+What was written: the temperature field is *"uniformly −1 at every width the ladder runs at"*,
+therefore temperature is a near-binary indicator rather than a graded field, therefore Phase
+12's sibling spread of `1.207` was one outlier over a mean of `−1`.
+
+What is true, from M39a's sweep across seeds and plies:
 
 ```
-ply 0..4, n = 4 and n = 6:   temperature field = [-1.0, -1.0, -1.0]
-                             24 of 240 candidates raise a region above -1
+fraction of regions hot, by ply
+  n = 4   0.00 0.04 0.04 0.21 0.21 0.33 0.46 0.62 0.67 0.75 0.71 0.71
+  n = 5   0.00 0.00 0.00 0.00 0.00 0.04 0.08 0.21 0.29 0.33 0.42 0.54
+  n = 6   0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.17 0.21 0.33 0.54 0.67
 ```
 
-The field is **uniformly −1** — every region is a *number*, which is the CGT convention for
-cold — and about a tenth of the moves lift one region to `0`. So temperature here is a
-near-binary *"this move heats a region"* indicator rather than a graded urgency field, and
-the 1.207 is one outlier in twenty-four divided by a mean sitting at −1.
+**The field is cold in the opening and hot from the middlegame on**, which is exactly what a
+temperature is supposed to do — Part IX §5.3's *"you can watch a region heat up before it
+matters"*, measured. And the hotness at depth is real rather than numerical: the median gap
+among hot regions at ply 8 to 11 is `0.25` to `0.875`, and the smallest is `0.0625` — ten
+orders of magnitude above the floor, so nothing that survives it is numerical.
 
-Decisions-05 §2 already hedges precisely this — the default weight is 0.15 rather than 0.7
-because nobody yet knows whether this is CGT temperature proper or something
-temperature-shaped, and Prompt B is still out. This is the measurement behind the hedge, and
-it says the hedge was right.
+**One cause, two wrong conclusions: the sample was the opening.** Five plies of one seed is the
+cold phase. `freeze.rs` walks four plies in, so its measurement sits in the same phase — which
+means the `1.207` was never an outlier artifact and stands as originally reported. The
+correction needed correcting.
 
-**A consequence worth its own line:** a constant heuristic adds a constant to every child's
-UCT score and reorders nothing, so on a flat field `temperature_bias` is inert *by
-construction*. `tests/search.rs` asserts that rather than asserting a change that does not
-happen — a test that demanded the weight move the search would have been demanding that a
-constant offset break ties, which would mean something else was wrong.
+The general form is worth keeping: **a quantity measured only where a game begins will look
+like whatever beginnings look like.** Nothing about the reading was wrong except where it was
+taken.
+
+What survives unchanged is the consequence for the implementation. A constant heuristic adds a
+constant to every child and reorders nothing, so `temperature_bias` is inert *at the opening*
+by construction, and `tests/search.rs` asserts that alongside the middlegame signal rather than
+instead of it.
 
 ### The tie-break that made a whole move class unreachable
 
@@ -1743,27 +1754,369 @@ could have produced a comparable number without one.
 
 ---
 
+## Phase 16 — The coldness sweep, and three readings taken in the wrong place  *(M39a)*  — DONE
+
+**Spec:** Decisions-06 Q16 and Q17.
+
+Q17 reverses the question the ladder was about to ask. **Do not run a Skill Trace at a width
+until you know the width has anything to trace** — and the diagnostic needs no games at all,
+only position evaluation. `overtone-orbit::coldness`, and `examples/coldness.rs`.
+
+### The answer
+
+```
+fraction of regions hot, by ply
+  n = 4   0.00 0.04 0.04 0.21 0.21 0.33 0.46 0.62 0.67 0.75 0.71 0.71
+  n = 5   0.00 0.00 0.00 0.00 0.00 0.04 0.08 0.21 0.29 0.33 0.42 0.54
+  n = 6   0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.17 0.21 0.33 0.54 0.67
+```
+
+**The game starts cold and heats up**, which is what a temperature is for — Part IX §5.3's
+*"you can watch a region heat up before it matters"*, measured. The hotness at depth is real
+rather than numerical: median gap `0.25` to `0.875` at ply 8 to 11, and the smallest surviving
+gap is `0.0625` — ten orders of magnitude above the `1e-12` floor.
+
+### The mistake that produced three wrong statements
+
+Phase 15 reported the field as *"uniformly −1 at every width the ladder runs at"* and drew two
+conclusions from it: that temperature is a near-binary indicator, and that Phase 12's sibling
+spread of `1.207` was one outlier over a mean of `−1`. Then this sweep's own first pass read
+the standing score as *"exactly zero for both players at every width."*
+
+**All three were the same error: the sample was the opening.** Five plies of one seed is the
+cold phase; `freeze.rs` walks four plies in and sits in the same phase; the standing-score
+reading came from a single position at six plies. With a real sample:
+
+```
+   n  mean absorbed(0)  mean absorbed(1)     1/dim
+   4          5.469e-2          6.641e-2   6.250e-2
+   5          7.617e-2          1.016e-1   3.125e-2
+   6         7.909e-34         2.929e-35   1.562e-2
+   7           0.000e0           0.000e0   7.812e-3
+```
+
+So the `1.207` was never an artifact and stands as originally reported; the correction needed
+correcting. **A quantity measured only where a game begins will look like whatever beginnings
+look like**, and this repository made that error three times in one afternoon before the sweep
+that was built to catch it caught it.
+
+### The floor has to be used everywhere it is defined
+
+`HOT_FLOOR` was defined, `Reading::is_hot` used it, and the example's by-ply table compared
+`left > right` directly — so the same quantity printed two different answers in one run. The
+headline read **0.88 hot at ply 6** where the floored value is **0.46**, and the inflated number
+had already reached the phase notes, `CLAUDE.md` and a gate line before the two tables were put
+side by side. With the floor applied consistently the smallest surviving gap is `0.0625`, ten
+orders of magnitude above it, so nothing that passes is numerical.
+
+### `left > right` is not a hotness test
+
+Gaps come in two populations — real ones at `1e-1` to `1e0`, and dust from `1e-32` down to
+`1e-96`. Without a floor, `n = 6` at ply 8 reports 50% hot with a *median* gap of `6.7e-32`,
+which is 50% of nothing. `HOT_FLOOR = 1e-12` is derived from the engine's own reproducibility:
+absorbed weight is a sum of `|amp|²` and native-versus-wasm amplitude agreement is `5.6e-16`,
+so weights agree to order `1e-15`. With the floor in place `n = 6, 7, 8` report `0.0%` instead
+of a spurious `8.3%`.
+
+### The width ruling: n = 5
+
+Q17 says run M39b at whichever width has hot structure. Measured, that is **`n = 5`** — hot
+from ply 4, standing score intact at `1e-1`, and one width wider than the retired `d = 6`.
+
+`n ≥ 6` is not cold. It is **numerically dead at this ply depth**: the players start at
+opposite corners of a `2^n` window and a coherent walk needs `O(n)` plies to cross, so at eight
+plies the overlap that absorbed weight measures has not happened yet. That is a different
+problem with a different fix — more plies, or a score that does not wait for overlap — and it
+is a hard ceiling on the current evaluation rather than a property of the game.
+
+### Q16's hypothesis, tested and not supported
+
+Decisions-06 proposed that `d` saturating at `n = 4` and the field being cold at `n = 4` might
+be one fact — a game whose components are all numbers has no tactical content, so no
+search-language enrichment could extend its ladder. **`n = 4` is 46% hot by ply 6 and 75% hot
+by ply 9.** Whatever shortens that ladder, it is not an absence of decisions. A clean negative
+on a specific hypothesis, recorded as one.
+
+### The decomposition is not the one Part IX justified
+
+Q16 asks whether the decomposition came apart from its justification in implementation. It did.
+Part IX §5.3 argues decomposition is available because *"the maze's corridor structure provides
+weakly-interacting regions naturally"*. `thermal::regions` splits **contiguous qubit blocks**.
+
+Those cannot be made into the same object. Orbit's cells are basis indices `0 … 2^n`, and a
+generator on qubits `{0, 1}` changes the amplitude on *every* cell — so the game does not
+decompose spatially at all, and a qubit-block split is the only decomposition available rather
+than the one the spec argued for. It works well enough to produce hot structure, which is the
+useful news, but the spec's justification does not cover what was built.
+
+That also re-reads a Phase 12 result. `interaction_leak` measured `0.0000` and was reported as
+the decomposition being exact. It is — but the positions it was measured on were cold, and sums
+of numbers are exact trivially. **The leak test passed for a degenerate reason.** Re-measuring
+it on hot positions is M39b's first line.
+
+**Prompt B gains a sixth item**, per Q16: when a decomposition yields subgames that are all
+numbers, is that evidence the decomposition is too fine, along the wrong axis, or that the
+position is genuinely cold — and what characterises a good decomposition in the CGT literature?
+The measurement above answers the *when* for Overtone (the opening, and only the opening) but
+not the *what characterises*.
+
+---
+
+## Phase 17 — The explainers  *(M54, inverted)*  — PLANNED
+
+**Spec:** Part X, as amended by Part XI. **This phase inverts Part X §9's build order**, and the
+inversion is the single most consequential thing the sweep found.
+
+### Why the explainers come first
+
+Part X §11 says the risk has moved from the game to the debrief, and that **M54 is the milestone
+that decides which project this is**. Part XI §2 then finds that the risk is larger than that,
+from the field's own survey and its developers' own traffic data:
+
+> Only around 1% of views for the blog post came from the in-app link. Around 58% came from
+> search engines.
+
+and their conclusion: *"the blog posts were a more successful learning resource than the app."*
+A second, independent case in the same paper — Battleships with partial NOT gates — *"there is
+little evidence of it being played, but the blog post remains the most viewed on the Qiskit blog
+by some margin."* Two cases, same direction, large margin.
+
+So a debrief screen inside the Gauntlet inherits the app's reach, which is to say almost none.
+Part XI's structural fix is to invert the dependency:
+
+```
+was:   level → in-game debrief screen → optional link out
+now:   nine standalone explainer pages, publicly indexed, complete without the game
+       ↑ the Gauntlet deep-links into the relevant one after each level
+```
+
+**Three further reasons to build them first, not merely to restructure them.**
+
+*They are testable immediately.* The acceptance test Part XI §3 specifies — *can a naive reader
+state, unprompted, why L3 was impassable?* — can be asked of a page today. It does not need a
+level to exist.
+
+*They give M53 a control arm.* With pages first, the same question can be put to a reader who
+only read the page and to one who played then read. **If the game arm does not beat the page
+arm, this repository has reproduced Part XI §2's finding in-house** and the Gauntlet should stay
+small. That comparison is cheap — five readers per arm — and Part XI §10 notes the field has no
+evaluation standard at all, so running one on yourself first is the honest order.
+
+*The valuable artifact survives the game not being built.* Wouters et al. find serious games
+beat conventional instruction at `d = 0.29` for learning and `d = 0.36` for retention, but **not
+in engineering** — one of the two domains where the advantage disappears — and one synthesis puts
+it plainly: *"if you compare serious games with active teaching, they do not appear to be more
+effective in terms of learning, whereas on average they are more expensive."* Build the cheap
+thing that works, and make the expensive thing earn its margin against it.
+
+### What is encouraging, specifically
+
+The one moderator both Clark et al. (2016) and Wouters converge on is **alignment between game
+mechanics and instructional content**. Part X §3's rule — *a level is a wall you cannot pass
+until you understand the theorem, and the key is always a capability, never a skill* — is that
+property taken to its limit. The mechanic **is** the concept. So the evidence is discouraging
+about the category and specifically encouraging about this design, which is exactly the position
+a two-arm test is for.
+
+### The nine pages
+
+One per level, each complete without the game, each reviewed against the **Minus-Sign Test**.
+Every one maps to a panel that already ships:
+
+| Page | The theorem | The instrument it points at |
+|---|---|---|
+| Spread | ballistic versus diffusive | `overtone-walk --example transport` |
+| The dark corridor | destructive interference | Part II P2; the phase-as-hue law |
+| The ceiling | `Var[∂C]` and the frequency ceiling — score exactly zero | `overtone-cli -- train`, the LP ceiling |
+| Resonance | trainable input scaling `λ` | the `sonify` toggle, already shipped |
+| The cage | AB caging, and that the coin is the cage | Phase 14's `3/7` on the 4-cube |
+| The feast | `dim(g)` up, gradients down | `overtone-cli -- predict` |
+| The front | decoherence and the Zeno effect | the shot dial |
+| Checkmate | losing as a controllability statement | `overtone-orbit --example checkmate` |
+| The mirror | the trainability–simulability tension | `overtone-cli -- dequantize` |
+
+### One page exists, as a format test
+
+`docs/explainers/the-ceiling.md` is written — L3, the one Part X §9 says has to land. It is the
+prototype, not the first of nine, and it exists for the same reason Part X tests M53 on a real
+person before building seven more levels: **the format is the risk, and one page is enough to
+find out.**
+
+It is written entirely from the instrument's own output rather than from memory. The staircase
+it turns on —
+
+```
+   C           J*
+   2     0.000000
+   3     0.500000
+```
+
+— is `overtone-cli -- ceiling --k 3` run as printed, and every file and flag it cites was
+checked to exist. `docs/explainers/README.md` states the three rules a page follows: complete
+without the game, every claim points at a runnable command, and passes the Minus-Sign Test
+explicitly rather than incidentally.
+
+### Three corrections to Part X that Phase 17 has to carry
+
+**L4 does not need sonification built.** Part X §9 calls it *"the highest impact-per-line item in
+the series and has been waiting since Part IV"*. It shipped in Phase 4 — `web/js/sound.js`,
+`sonification_tones(k, lambda)` in the wasm crate, and a `sonify` checkbox that already never
+autoplays. M55's largest stated dependency does not exist.
+
+**L9's number is wrong and must be read, not written.** Part X §3 says the ending reports
+*"effective χ = 4"*. The measurement at `n = 4, L = 3` is **`χ = 3`**, and `scripts/gate.sh`
+asserts it. An ending whose punchline is a written constant is a twist; an ending that runs
+`dequantize` on the player's own final circuit and prints what comes back is the thing Part X
+§10 asks for when it says do not let L9 be triumphant.
+
+**"Zero new engine work" is not true.** Part X §8 claims zero new physics, zero new mechanics,
+zero new engine work. The first two hold. The third does not, and the constraint is already
+written down: `scripts/check_js_budget.sh` caps hand-written JS at 1200 lines, the page stands at
+**1186**, and the rule the number enforces is that *no panel computes a physical quantity*. So
+every wall predicate, every pass condition and every level definition has to live in Rust behind
+the wasm boundary, and the sparse renderer needs JS the budget does not have. The honest cost is
+a new module plus a deliberate, documented budget raise — the same way it went from 800 to 1200.
+
+---
+
+## Phase 18 — M53, and the two-arm test  *(M53, M54b)*  — PLANNED
+
+**L1 and L3 only**, per Part X §9, with Part XI §3's acceptance and the control arm above.
+
+**M53 acceptance, stated so it can fail:** ten readers with no quantum background, five per arm.
+Arm A reads the ceiling explainer. Arm B plays L1 and L3, hits the wall, then reads the same
+page. Both are asked, unprompted, why the score was zero and why more training could not fix it.
+**The Gauntlet is worth building out if arm B's answers are better; it is not if they are the
+same.** Part X §10's own instruction — *test M53 on a real person* — with a comparison attached,
+because Part XI §3 says the category's evidence is weak and the one thing that predicts success
+is the property this design has.
+
+**M54b — the histogram, which is an instrument before it is a game feature.** Zachtronics'
+solution histograms replaced leaderboards for two stated reasons: a leaderboard is *"a fantastic
+incentive for cheating"*, and for most players *"the only thing a global leaderboard manages to
+tell you is that you suck (and not even by how much)"*. Barth's third point is the one that
+matters here — *"because we include three antagonistic metrics, players optimizing for one
+criterion often do poorly in the others"*. **A game designer arrived independently at Part VII's
+Axiom II and shipped it in 2011.**
+
+Overtone's three are antagonistic **by theorem** rather than by design:
+
+```
+dim(g)        expressiveness  ↑  →  Var[∂C] ∝ 1/dim(g) collapses
+effective χ   classicality    ↓  →  requires large dim(g)
+work units    cost            ↓  →  limits search depth
+```
+
+Nobody has shipped a histogram whose axes are antagonistic for a proven reason. And the
+distribution of solutions across `(dim g, χ, work)` is exactly the data Part VII §8 wants for the
+depth measurement, so **the display and the measurement are one object**. No unlocks, no
+achievements — Barth again: *"the players who do optimize are often more intrinsically
+motivated."*
+
+---
+
+## Phase 19 — The rest of the Gauntlet  *(M55–M58)*  — PLANNED
+
+L2/L4/L5, then L6/L7/L8, then L9, then nav and first-visit routing — Part X §9's order,
+unchanged, and gated on Phase 18's comparison. If arm B does not beat arm A, this phase is one
+level and a link rather than seven.
+
+**Two claim-discipline rules carried in from Part XI, both non-negotiable.**
+
+*No "players find what algorithms miss."* The most-cited result in quantum citizen science is
+retracted — and both halves of it. Part XI verified the News & Views retraction and flagged the
+primary paper as unchecked; it is **also retracted**, in August 2020, withdrawn by its own
+authors for an error in their optimisation code that invalidated the quantitative results. The
+careful follow-up (Phys. Rev. Research 3, 013057) reports player-assisted results *"roughly on
+par with the best of the tested standard optimization methods"* — parity, with the authors'
+own caveat attached. **This field has already run that experiment.** Do not claim it unless the
+grid says so and it replicates.
+
+*Scale calibration.* HyperRogue has 403 Steam reviews; Quantum Flytrap reports *"around 70 users
+on a regular working day."* This category does not produce mass audiences. It produces small,
+durable, high-quality ones, and that is the correct expectation.
+
+### One sharpening to Part XI's own analysis
+
+Part XI §8 states *"there is no Sprague–Grundy Theorem for misère play impartial games"*, and
+uses it to argue that reductions of this kind are fragile. The claim is too strong and the
+accurate version is better for the point being made. The **naive** misère generalisation is
+hopelessly complicated and useless beyond simple cases — but Plambeck & Siegel's **misère
+quotient** (JCTA 2008) is the working generalisation, and its authors call it the long-sought
+natural one.
+
+So the reduction does not break. It **degrades**: from a group to a commutative monoid, from one
+integer to a possibly large algebraic object, and from free combination to a multiplication in
+that monoid. That is a sharper analogy for `dim(g)` than a missing theorem, and it sits beside
+the contrast Part XI draws correctly:
+
+```
+nimber(G + H) = nimber(G) ⊕ nimber(H)              combining is free
+dim(closure(g₁ ∪ g₂)) ≠ dim(g₁) + dim(g₂)          commutators generate new elements
+```
+
+**Sprague–Grundy is exactly the theorem Overtone does not get, and its absence is the mechanic.**
+
+---
+
 ## The Decisions documents, and what they change
 
-Five rulings documents supersede parts of the specs where they conflict:
+Six rulings documents supersede parts of the specs where they conflict:
 [`decisions-01-phase-10.md`](spec/decisions-01-phase-10.md) rules on the eight open Phase 10
 questions; [`decisions-02-synthesis.md`](spec/decisions-02-synthesis.md) synthesises four
 external research passes into a claims audit; and
 [`decisions-03-revised.md`](spec/decisions-03-revised.md) rules on the walk operator, the v1
 feature vocabulary and the licence, and supersedes an earlier Decisions-03 in full.
 Decisions-04 amends the MCTS design and **is not in this repository** — see the note below.
-[`decisions-05.md`](spec/decisions-05.md) then amends Decisions-04 from two MCTS research
-passes. All of them are committed to `docs/spec/` because a ruling that lives outside the
-repository is a ruling that gets lost.
+[`decisions-04.md`](spec/decisions-04.md) rules on spec immutability, build order, temperature
+as move ordering, and the README; [`decisions-05.md`](spec/decisions-05.md) amends Decisions-04
+from two MCTS research passes; and [`decisions-06.md`](spec/decisions-06.md) recovers the fifth
+feature, sharpens the coldness result and reverses the ladder-width question. All of them are
+committed to `docs/spec/` because a ruling that lives outside the repository is a ruling that
+gets lost, and [`spec/README.md`](spec/README.md) states the convention they follow.
 
-**Decisions-04 is missing and it matters in one specific place.** Decisions-05 references it
-four times — it specified PUCT (§1), used `0.7` as the example weight (§2), and its §6 table
-records the frozen eval vector as **five features**. The vector frozen here is **four**:
-`dim_g`, `orbit_size`, `safe_set_size`, `half_chain_entropy`, which is what
-`overtone-orbit/examples/freeze.rs` measured against Decisions-03 Q1's six. Everything else
-Decisions-05 changes lives in `[agent.search]` and is implemented; the fifth feature is the one
-thing that cannot be recovered from the documents present, and guessing it would be worse than
-saying so.
+**The "five features" line, and what actually happened.** Decisions-05 §6 records the frozen
+eval vector as five, and this repository freezes four. Decisions-06 Q15 settles it: that is not
+a disagreement between documents, it is the Decisions-03 Q1 cut rule running. The five are its
+six minus `temperature`, which Decisions-04 Q13 moved to `[agent.search]`:
+
+```
+Decisions-03 Q1     six    coherence, dim_g, orbit_size, safe_set_size,
+                           temperature, average_branching
+Decisions-04 Q13    five   temperature -> [agent.search], as a move-ordering
+                           heuristic rather than an eval feature
+measurement         four   see below
+```
+
+Q1's own rule was *"cut anything with near-zero sibling variance"*, and it pre-authorised the
+outcome: *"if it does not, v1 is the other five and you say so in the docs."* This is that
+saying, with the numbers:
+
+```
+                  sibling spread   leaf spread   us/call   frozen
+dim_g                    0.546        32.006       0.28    yes
+orbit_size               0.347            --       3.83    yes
+safe_set_size            0.000         0.534       0.16    yes -- on the leaf test
+half_chain_entropy       0.000         5.053       1.00    yes -- on the leaf test
+temperature              1.207            --     714.11    no  -- moved to [agent.search]
+coherence                0.000         0.000       0.00    no  -- cut, sibling variance
+average_branching        0.000         0.000       0.00    no  -- cut, sibling variance
+separation_deficit       0.027            --       4.00    no  -- dominated by dim_g at 14x cost
+```
+
+Two of Decisions-04's five are **provably** constant, not merely measured so. `coherence` falls
+by `k` on every ply whichever arm of `Game::apply` runs, so it is a pure function of depth;
+`average_branching` is `legal_moves(n).len()`, which does not depend on the move. Neither can
+ever discriminate between siblings, so including them would be carrying two dimensions that
+cannot change a comparison.
+
+`half_chain_entropy` is the one that came *back*. Q1 excluded it on cost without profiling —
+*"cost-disqualified unless you have profiled it"* — and profiled it is 1.00 µs and the second
+best leaf discriminator in the table.
+
+*(Decisions-06 Q15's worked example guesses that `dim_g` was the feature cut. It was not:
+`dim_g` has the largest sibling spread of the survivors. The cuts were `coherence` and
+`average_branching`, both at exactly zero.)*
 
 **The one that reorders everything.** Decisions-01 Q1: `d` is a property of *(game, strategy
 language)*, so the agent language is part of the experimental apparatus and must be frozen

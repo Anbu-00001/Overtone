@@ -109,6 +109,19 @@ Two of the seven are not in the table, and their absence is the point of the exe
 Decisions-03 Q10 sets the bar as **every clause maps to a shipped instrument**, and applied
 honestly that bar deletes rows. Those two are arguments, so they are prose and not table rows.
 
+Other standard criticisms are addressed by instruments not yet shipped; **rows appear here when
+the panels do**, in the same commit, which is a rule written into
+[CONTRIBUTING.md](CONTRIBUTING.md) rather than an intention.
+
+And one external standard, adopted explicitly. Scott Aaronson's **Minus-Sign Test**: to pass,
+a popularisation need only *"mention the minus signs: i.e., interference between positive and
+negative amplitudes, the defining feature of quantum mechanics, the thing that makes it
+different from classical probability theory."* Most quantum popularisation fails it — "in two
+states at once" does not distinguish superposition from classical uncertainty. Overtone passes
+structurally rather than by effort: phase-as-hue is on every panel, and the dark corridor is
+the minus sign made into a mechanic. It is a one-line quality bar from a credible source, and
+every explainer page written here is reviewed against it.
+
 ---
 
 ## The demo

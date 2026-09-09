@@ -139,6 +139,12 @@ belongs in the code with its derivation beside it; anything that fails it belong
 [`presentation.toml`](presentation.toml), which has a test that perturbs every constant in it
 and asserts no result moves.
 
+**The dismissals table grows one row per panel, in the panel's own commit.** The README's
+table of standard criticisms has a rule: a row appears when the instrument that answers it
+ships, in the same commit, and never before. That makes the front page self-maintaining rather
+than something that drifts and needs a rewrite before launch. Rows whose panels do not exist
+yet are not written as promises; the table says so in a line of its own instead.
+
 **Cite the source, not the summary.** More than one correction in this repository came from
 reading a paper's body after its abstract had been trusted. If a citation is load-bearing, the
 docstring says which section of it.

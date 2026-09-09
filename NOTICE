@@ -25,6 +25,14 @@ to users over a network counts as conveying it, so a hosted fork owes its source
 to the people using it. A permissive licence would allow a closed hosted variant
 whose numbers nobody could audit, which would defeat the point of the project.
 
+Authorship. All commits prior to 3ad4e5f were authored by Anbuchelvan Ganesan,
+committing under the handle Anbu-00001. Sole authorship through Phase 13; the
+copyright header carries the legal name from Phase 13 onward. This is recorded
+here rather than by rewriting history, so that provenance can be established
+from a file in the tree instead of by correlating a handle against commit
+metadata -- which matters if the contributor-licence question in CONTRIBUTING
+ever becomes live. Sole authorship is the easy case and it is only true now.
+
 Prior versions of this work were distributed under Apache-2.0. That grant is
 irrevocable for the versions it was made under; this change applies from the
 commit that introduced it onward.

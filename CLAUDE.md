@@ -399,15 +399,21 @@ Credibility is the scarce resource in this field.
   are three distinct notions -- one-shot, concurrent, search -- and only the first two are
   what Phase 5's families measure.
 - **A flat heuristic plus a stable sort is the move generator's enumeration order.** The
-  temperature field is uniformly `-1` at the widths the ladder runs at, so every candidate
-  ties; under progressive widening the root expands about 23 of 240, and since
-  `legal_moves` emits all 208 `Apply` candidates before the 32 `Measure` ones, **no measure
-  move was ever tried**. Shuffle before a stable sort whenever the key can be constant.
-- **`temperature`'s sibling spread of 1.207 is one outlier, not a gradient.** The field is
-  `-1` (a *number*, the CGT convention for cold) on 23 of 24 siblings and `0` on one; the
-  relative spread `(max-min)/|mean|` divides that single step by a mean sitting at `-1`. A
-  relative-spread metric inflates a near-binary indicator into the best-looking feature in
-  the table. Look at the values before trusting a spread.
+  temperature field is uniformly `-1` *in the opening*, so every candidate ties; under
+  progressive widening the root expands about 23 of 240, and since `legal_moves` emits all
+  208 `Apply` candidates before the 32 `Measure` ones, **no measure move was ever tried**.
+  Shuffle before a stable sort whenever the key can be constant.
+- **Never characterise a game quantity from opening positions alone.** This one cost two
+  wrong conclusions in a row. The temperature field is `-1` everywhere for the first few
+  plies and then heats up -- 0% of regions hot at ply 0, 46% by ply 6, 75% by ply 9 at
+  `n = 4` -- so a sample of five plies from one seed reported "uniformly cold" and produced
+  both a false claim about the heuristic and a false correction to a Phase 12 measurement
+  that had been right. **A quantity measured only where a game begins will look like
+  whatever beginnings look like.**
+- **`left > right` is not a hotness test.** Measured gaps come in two populations: real ones
+  at `1e-1` to `1e0` and dust from `1e-32` down to `1e-96`. Without a floor, `n = 6` at ply 8
+  reports 50% hot with a median gap of `6.7e-32`, which is 50% of nothing. The floor is
+  `1e-12`, derived from native-versus-wasm amplitude agreement at `5.6e-16`.
 - **A constant heuristic cannot reorder anything.** `W*H/(1+n)` with `H` constant adds the
   same number to every child. A test asserting that the weight changes the search would be
   asserting that a constant offset breaks ties -- so on a flat field, assert the inertness.
@@ -422,3 +428,16 @@ Credibility is the scarce resource in this field.
 - **A rate hides the shape; print W/D/L.** Low-budget agents here do not lose, they *draw*,
   and converting draws is what compute buys. Two rungs can look identical on the rate and be
   completely different underneath.
+- **Sample across seeds and plies, or measure nothing.** Three separate wrong statements in
+  one afternoon came from the same habit: reading a game quantity off the opening. The
+  temperature field is `-1` for the first few plies and then heats up; the standing absorbed
+  weight looks like zero at six plies and is `1e-1` at eight. Both readings were taken from
+  one seed near the start. **A quantity measured only where a game begins will look like
+  whatever beginnings look like**, and the second and third errors were *corrections* to the
+  first, which is how a bad sample propagates.
+- **A threshold defined in one place and bypassed in another prints two different answers
+  for the same quantity.** `coldness.rs` defines `HOT_FLOOR` and `Reading::is_hot` uses it --
+  but the by-ply table in the example compared `l > rr` directly, so the headline read `0.88`
+  hot at ply 6 where the floored value is `0.46`, and the inflated number reached the phase
+  notes, the traps file and a gate line before the two tables were compared. If a predicate
+  is worth a named constant, nothing may re-implement it inline.
