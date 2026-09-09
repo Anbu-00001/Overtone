@@ -1862,7 +1862,142 @@ not the *what characterises*.
 
 ---
 
-## Phase 17 — The explainers  *(M54, inverted)*  — PLANNED
+## Phase 17 — The memo, and the Skill Trace  *(Q8, M39b)*  — DONE
+
+**Spec:** Decisions-01 Q8; Decisions-06 Q17; Browne (CoG 2022); Goodman, Perez-Liebana & Lucas
+(CoG 2024).
+
+### Q8: the ruling's rule holds and its three examples do not
+
+Q8 rules that the memo table keys on the **discrete state only**, never on amplitudes, because
+two move orders never produce bit-identical amplitude vectors and an amplitude-keyed table would
+pay an invented tolerance for a cache that never hits. That reasoning is right. The five-part key
+it proposes is not, and neither are two of the three computations it names as
+amplitude-independent:
+
+```
+closure(hand)                    f(hand)                       keys, and is the expensive one
+OrbitCertificate::new(algebra)   f(algebra) = f(hand)          keys, and is expensive
+Position::is_checkmate           f(certificate, STATE, safe)   does not key
+thermal::region_options          applies moves, reads weights  does not key
+```
+
+`is_checkmate` calls `is_check`, which is `absorbed_weight > tolerance`, and then
+`certainly_unreachable(&self.state, …)`. Q8 calls the checkmate predicate keying cleanly *"a
+load-bearing accident of the design and worth noting in the docs"* — it is not one, and a table
+memoising it on the discrete key would return **stale answers rather than slow ones**, which is
+the worse failure.
+
+What survives keys on **one field of the five**. The same hand under a different safe set has
+the identical algebra and the identical certificate, so putting the safe set in the key turns a
+hit into a miss for nothing. **The key is too wide, not too narrow.**
+
+### And the memo pays for the two searches the ruling calls secondary
+
+```
+   agent   budget   lookups distinct hit rate
+   stoat      512       160        2    98.8%       greedy
+    pike      512      1740       72    95.9%       negamax
+ kestrel      512      1020     1020     0.0%       mcts
+```
+
+The split is structural. greedy and negamax evaluate the **siblings** of one position, and the
+rotation angle does not change the hand — eight candidates per move share one algebra, and two
+distinct hands cover 160 lookups for a pawns-only agent. MCTS evaluates only at rollout leaves,
+and a rollout applies random generators down a path, so **every leaf has a hand no other leaf
+has**: 1020 lookups, 1020 distinct. A rollout's purpose is to reach positions nobody has seen,
+and a cache cannot help with that by construction.
+
+So Q8's table pays for the two kinds Decisions-01 calls secondary and nothing for the one it
+calls primary. Worth having, and worth saying plainly, because the obvious expectation is the
+opposite.
+
+### M39b: Browne's formula, implemented as published
+
+```text
+matches   UCT_{2^(m-1) BF} vs UCT_{2^m BF}
+score     the strong agent's mean result, 1 = win, 0 = draw, -1 = loss
+f         least-squares line through the scores, FROM THE SECOND MATCH ON
+y         f(M + 1), clamped to [0, 1]
+A         sum over all M matches of max(0, score)^2
+ST        y + (1 - y) A
+```
+
+Three details that change the number and are easy to lose. **The score is a mean in `[-1, 1]`,
+not a win fraction** — a draw is `0`, not a half, and `search::win_rate` is the other convention.
+**The first match is discarded from the regression**, because UCT's first `BF` iterations are
+random move choices so `UCT_2BF` unduly outperforms `UCT_BF`. And **the pseudocode sums `A` over
+all `M` matches including the discarded one**, where the prose reads as excluding it — the code
+follows the algorithm and reports both, so the difference is visible rather than chosen quietly.
+`tests/memo.rs` checks the formula against a case worked by hand from the paper.
+
+### Two properties of ST that the comparison chart has to carry
+
+**ST is not scale-free in ladder length.** `A` is a *sum*, so a longer ladder has more terms, a
+larger `A`, and a larger ST. Browne runs until a time limit, so ladder length varies between
+games — and **two ST values measured over ladders of different length are not measuring the same
+quantity.**
+
+**ST is not bounded above by 1.** With `y` low and `A` above one, `y + (1 − y)A` exceeds it. An
+early run of this grid produced exactly that.
+
+### What the grid says, and what it cost to find out
+
+```
+ Orbit greedy, n=5   0.431      Dots + Boxes   0.353
+        Dominion     0.288         Connect 4   0.282
+Orbit negamax, n=4   0.211          Sushi Go   0.189
+      Can't Stop     0.028       Tic-Tac-Toe   0.000
+```
+
+Read as a position on a chart, not as a claim that Orbit is deeper than Dots + Boxes. Goodman's
+values are measured with MCTS agents; these two rows are greedy and negamax; they are not even
+at the same width as each other; the games per pairing are 240 and 60 against the 1600 that buys
+±10 Elo; and the ladders are three and four adjacent matches long, which is short in a metric
+that is not scale-free in that length.
+
+**Only one of the three declared search kinds could be traced at the ruled width.** Measured:
+
+```
+      kind   budget   s per game   1600 games
+      mcts      320      271.812     120.8 h
+   negamax      320       42.734      19.0 h
+    greedy      320        0.032       0.0 h
+```
+
+Browne's ladder *starts* at `BF` — 360 at `n = 5`, since Overtone's action is a `(move, angle)`
+pair — so the first mcts match is 360 vs 720, above the 320 measured here. The grid has fifteen
+pairings. **The published protocol run with mcts at BF-scaled budgets is not affordable**, and
+that is the sharper finding: Decisions-06 Q17 chose `n = 5` because it has hot structure and an
+intact standing score, and at that width two of the three kinds in the frozen language cost more
+per game than the protocol can spend.
+
+Reporting per kind is not a retreat. Goodman's own contribution is that expanding the algorithmic
+space changes a game's estimated depth, so best achievable performance at a budget must be a
+**maximum over an algorithm space** rather than one algorithm's curve — and a frozen language
+with three declarable kinds is that space.
+
+### Two bugs the grid caught, both the same shape
+
+**greedy's ladder ran past saturation.** greedy searches every candidate once its budget reaches
+the candidate count, so every budget above it is the same agent. Three of the first ladder's six
+matches were saturated pairs at exactly `0.000`, and they dragged the regression until `y` pinned
+at zero. `trace::saturation` now cuts the ladder where the kind stops changing.
+
+**negamax's budget was selecting an enumeration prefix, not a search.** It never reached depth 2
+at any affordable budget, and `negamax_root` scanned candidates in the order `legal_moves` emits
+them — so "budget `b`" meant "the best of the first `b` candidates in enumeration order." The
+measured consequence was not subtle: **budget 6 beat budget 48 sixty games to nil, and budget 96
+lost to budget 6 by the same margin.** Shuffling the root candidates fixes it and the grid is
+monotone afterwards.
+
+Both are the enumeration order of `legal_moves` leaking into behaviour — the third time in this
+repository, after the widening tie-break in Phase 15. It is now a trap in `CLAUDE.md` in its
+general form rather than as three separate incidents.
+
+---
+
+## Phase 18 — The explainers  *(M54, inverted)*  — PLANNED
 
 **Spec:** Part X, as amended by Part XI. **This phase inverts Part X §9's build order**, and the
 inversion is the single most consequential thing the sweep found.
@@ -1979,7 +2114,7 @@ a new module plus a deliberate, documented budget raise — the same way it went
 
 ---
 
-## Phase 18 — M53, and the two-arm test  *(M53, M54b)*  — PLANNED
+## Phase 19 — M53, and the two-arm test  *(M53, M54b)*  — PLANNED
 
 **L1 and L3 only**, per Part X §9, with Part XI §3's acceptance and the control arm above.
 
@@ -2015,7 +2150,7 @@ motivated."*
 
 ---
 
-## Phase 19 — The rest of the Gauntlet  *(M55–M58)*  — PLANNED
+## Phase 20 — The rest of the Gauntlet  *(M55–M58)*  — PLANNED
 
 L2/L4/L5, then L6/L7/L8, then L9, then nav and first-visit routing — Part X §9's order,
 unchanged, and gated on Phase 18's comparison. If arm B does not beat arm A, this phase is one
@@ -2056,6 +2191,92 @@ dim(closure(g₁ ∪ g₂)) ≠ dim(g₁) + dim(g₂)          commutators gener
 ```
 
 **Sprague–Grundy is exactly the theorem Overtone does not get, and its absence is the mechanic.**
+
+---
+
+## Phase 21 — Deployment: a Static Space, and why there is no backend  — READY, UNPUSHED
+
+**Target:** a Hugging Face Static Space, free tier. Full instructions in
+[`docs/DEPLOY.md`](DEPLOY.md).
+
+### The constraint decides the architecture, and it decides it correctly
+
+Hugging Face's own documentation:
+
+> Static Spaces are free for everyone. Gradio and Docker Spaces run on compute and require a
+> paid plan to create: PRO for personal accounts, Team or Enterprise for organizations.
+
+So on the free tier the only SDK is `static`. For most projects that is a real constraint. Here
+it is not, because **the frontend already is the engine** — and two existing gate lines are why:
+
+- `scripts/wasm_determinism.sh` checks native and WASM agree to `1e-13`, per Part I §5's
+  requirement that every run be reproducible from a seed in both.
+- `scripts/check_js_budget.sh` enforces that **no panel computes a physical quantity**. Every
+  number a panel draws arrives from the WASM boundary already fitted and already normalised.
+
+Between them there is nothing left for a server to do, and adding one would move logic out of
+Rust — which is what the budget exists to prevent. **There is no backend to deploy, and that is
+a property of the design rather than a concession to the free tier.**
+
+The league does not change it. Decisions-01 Appendix A already designs it as GitHub Actions
+running the matches and pushing to a Hugging Face Dataset: a scheduled job and a data
+repository, not a service.
+
+### Two documented facts the bundle has to respect
+
+**Persistent storage is no longer available on Spaces** — the `suggested_storage` field is
+documented as ignored. Nothing may assume writable disk.
+
+**A Space serves from its repo and rebuilds on every push**, so the bundle must be
+self-contained. `web/pkg/` is gitignored here because it is build output, and it has to be *in*
+the bundle. `scripts/build_space.sh` assembles it and refuses to finish otherwise:
+
+```
+building wasm
+assembling dist
+checking the bundle is self-contained
+bundle ok: 537 KiB total, 358 KiB wasm
+```
+
+The check resolves every `href` and `src` in the HTML and every relative import in every JS
+module against the bundle, and fails on the first that does not exist. It was verified by
+breaking the bundle on purpose — removing `js/sound.js` and the `.wasm` — and confirming both
+are caught. **A Space that builds and then 404s on a module is only visible after a push
+otherwise**, which is the whole reason this is a gate line rather than a deploy-time surprise.
+
+One thing that also drops out: `wasm-pack` writes a `.gitignore` inside `pkg/`, which would stop
+the Space repo from tracking the very files it has to serve. Removing it is not optional.
+
+### The deploy is automated and inert until it is configured
+
+`.github/workflows/space.yml` builds the bundle and pushes it on every push to `main`, guarded
+by `if: vars.HF_SPACE != ''`. Until the repository variable and the `HF_TOKEN` secret exist the
+job skips — a fork should not go red on every push for a deployment it was never going to do.
+
+`pages.yml` was already written as *"a mirror of the Hugging Face Static Space, so neither host
+is a single point of failure. Both serve the same bytes."* It has been waiting for this half
+since Phase 4.
+
+### What is not done
+
+Nothing is pushed. The Space has to be created under an account and the push needs credentials,
+so `docs/DEPLOY.md` carries both the workflow configuration and the manual commands rather than
+this repository running them.
+
+Two things to check on the first deploy, both documented there: whether the `.wasm` is served as
+`application/wasm` (the `wasm-bindgen` glue falls back to `arrayBuffer` on a mismatch, so the
+page works either way, but the fallback costs a second pass over 358 KiB and the fix is a
+`custom_headers` block), and whether the free tier's sleep-after-inactivity is acceptable — for
+a static bundle it costs a cold start and nothing else, because no process holds state.
+
+### And the explainers are what most needs this
+
+Phase 18's pages have to be **crawlable**, which is the entire finding behind inverting Part X's
+build order: Hello Quantum's companion post drew 58% of its traffic from search engines and 1%
+from the in-app link. Markdown in a repository is not a search result. They are written as
+Markdown in `docs/explainers/` today because that is where a contributor reads them; shipping
+them means serving them as HTML from this bundle, and the JS budget rules out converting in the
+browser. That conversion is Phase 18's work.
 
 ---
 

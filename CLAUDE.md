@@ -441,3 +441,10 @@ Credibility is the scarce resource in this field.
   hot at ply 6 where the floored value is `0.46`, and the inflated number reached the phase
   notes, the traps file and a gate line before the two tables were compared. If a predicate
   is worth a named constant, nothing may re-implement it inline.
+- **The enumeration order of `legal_moves` leaks into behaviour wherever a search stops
+  early.** Three incidents, one shape. Progressive widening expanded a prefix and no measure
+  move was ever tried; `negamax_root` scanned candidates in generation order and aborted on
+  the node budget, so "budget b" meant "best of the first b candidates" -- budget 6 beat
+  budget 48 sixty games to nil and budget 96 lost to budget 6 by the same margin. **Any
+  place a budget truncates a candidate scan must sample or shuffle first**, or the compute
+  axis is measuring the move generator.

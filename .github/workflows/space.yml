@@ -1,0 +1,65 @@
+name: space
+
+# Deploy the static bundle to a Hugging Face Space.
+#
+# `pages.yml` calls itself a mirror of this Space so that neither host is a single point of
+# failure, and both serve the same bytes. This is the other half: the Space itself.
+#
+# Why a Static Space and not a service. Hugging Face's documentation is explicit -- "Static
+# Spaces are free for everyone. Gradio and Docker Spaces run on compute and require a paid plan
+# to create." On the free tier `static` is the only SDK, and Overtone needs nothing else: the
+# engine compiles to WASM and `scripts/check_js_budget.sh` enforces that no panel computes a
+# physical quantity, so the frontend *is* the engine. See docs/DEPLOY.md.
+#
+# This job is a no-op until the Space exists. `vars.HF_SPACE` is the repository variable holding
+# `<user>/<space>`, and `secrets.HF_TOKEN` a write token for it. Without them the workflow skips
+# rather than failing, so a fork or a fresh clone does not go red on every push for the sake of
+# a deployment it was never going to do.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: space
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: vars.HF_SPACE != ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: jetli/wasm-pack-action@v0.4.0
+
+      - name: Build the bundle
+        run: ./scripts/build_space.sh dist
+
+      - name: Push to the Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ vars.HF_SPACE }}
+        run: |
+          if [ -z "$HF_TOKEN" ]; then
+            echo "HF_SPACE is set but HF_TOKEN is not; add a write token as a repository secret"
+            exit 1
+          fi
+          cd dist
+          git init -q -b main
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Overtone ${GITHUB_SHA:0:7}"
+          # Force is correct here and only here. The Space repository is regenerated from the
+          # bundle on every deploy, so its history carries nothing that is not already in this
+          # one -- it is a build artefact, not a second source of truth.
+          git push --force -q "https://user:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE}" main
+          echo "deployed to https://huggingface.co/spaces/${HF_SPACE}"

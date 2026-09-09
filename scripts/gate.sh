@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The gate. Every claim in the README has a line here that fails when it stops being true.
 #
-# Run from the repository root. Phases 1-16.
+# Run from the repository root. Phases 1-17.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
@@ -33,7 +33,7 @@ expect() {
   fi
 }
 
-echo "PHASE 1-16 GATE"
+echo "PHASE 1-17 GATE"
 
 run "cargo fmt --check"                cargo fmt --all -- --check
 run "clippy -D warnings"               cargo clippy --workspace --all-targets -- -D warnings
@@ -316,6 +316,27 @@ expect "the hot floor kills the dust at n>=6" \
 expect "the standing score dies at n=6, not n=5" \
   '^  5         7\.617e-2         1\.016e-1' \
   cargo run --release -q -p overtone-orbit --example coldness
+
+# Phase 17 acceptance. Decisions-01 Q8; Decisions-06 Q17; Browne CoG 2022.
+expect "the memo pays for the sibling searches" \
+  '^ +stoat +512 +128 +2 +98\.4%' \
+  cargo run --release -q -p overtone-orbit --example memo
+
+expect "and pays nothing for mcts, by construction" \
+  '^ +kestrel +512 +1022 +1022 +0\.0%' \
+  cargo run --release -q -p overtone-orbit --example memo
+
+expect "Browne's formula, checked against the paper" \
+  'test result: ok\. 6 passed' \
+  cargo test --release -q -p overtone-orbit --test memo
+
+expect "the Skill Trace at the ruled width" \
+  'ST = y \+ \(1 - y\) A = 0\.4305' \
+  cargo run --release -q -p overtone-orbit --example trace
+
+# Deployment. The bundle a Hugging Face Static Space serves has to be self-contained, and that
+# is only visible after a push otherwise.
+run "static bundle is self-contained"  ./scripts/build_space.sh /tmp/overtone-space-check
 
 echo
 echo "  passed=$passed failed=$failed"
