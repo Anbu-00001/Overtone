@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The gate. Every claim in the README has a line here that fails when it stops being true.
 #
-# Run from the repository root. Phases 1-12.
+# Run from the repository root. Phases 1-13.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
@@ -33,14 +33,14 @@ expect() {
   fi
 }
 
-echo "PHASE 1-12 GATE"
+echo "PHASE 1-13 GATE"
 
 run "cargo fmt --check"                cargo fmt --all -- --check
 run "clippy -D warnings"               cargo clippy --workspace --all-targets -- -D warnings
 run "clippy (parallel)"                cargo clippy -p overtone-sim --features parallel --all-targets -- -D warnings
 run "cargo test --workspace"           cargo test --workspace
 run "cargo test (parallel)"            cargo test -p overtone-sim --features parallel
-for c in sim rl spec lie gsim walk wfc qd graph opt orbit cgt; do
+for c in sim rl spec lie gsim walk wfc qd graph opt orbit cgt otn; do
   run "overtone-$c -> wasm32"          cargo build -p "overtone-$c" --target wasm32-unknown-unknown
 done
 run "wasm-pack build"                  wasm-pack build crates/overtone-wasm --target web --out-dir pkg --release
@@ -216,6 +216,39 @@ expect "two temperatures do not track each other" \
 expect "decomposition does not leak" \
   'mean interaction leak .*: 0\.0000' \
   cargo run --release -q -p overtone-orbit --example twotemps
+
+# Phase 13 acceptance. Part VI 1, Part VIII 1, 8, 10.
+expect "Pauli exclusion is exact in the mode basis" \
+  'fermionic +1\.00 +0\.000000' \
+  cargo run --release -q -p overtone-walk --example statistics
+
+expect "two fermions share a site" \
+  'fermionic +1\.00 +0\.000000 +0\.093750' \
+  cargo run --release -q -p overtone-walk --example statistics
+
+expect "the anyonic dial interpolates" \
+  'anyonic +0\.50 +0\.093750' \
+  cargo run --release -q -p overtone-walk --example statistics
+
+expect "bosons bunch where fermions do not" \
+  'similarity\(bosonic, fermionic\) += 0\.7708' \
+  cargo run --release -q -p overtone-walk --example statistics
+
+expect "Overtone-100 is fully verified" \
+  'VERDICT all-verified: 100/100' \
+  cargo run --release -q -p overtone-otn --example hundred
+
+expect "no benchmark category can be guessed" \
+  'reachability balance: 15 reachable, 15 not' \
+  cargo run --release -q -p overtone-otn --example hundred
+
+expect "a puzzle is a few hundred bytes" \
+  'the whole set serialises to [0-9]+ bytes \(2[0-9][0-9] per puzzle\)' \
+  cargo run --release -q -p overtone-otn --example hundred
+
+expect ".otn round-trips byte-exactly" \
+  'test result: ok\. 11 passed' \
+  cargo test --release -q -p overtone-otn --test roundtrip
 
 echo
 echo "  passed=$passed failed=$failed"

@@ -14,6 +14,7 @@ members = [
     "crates/overtone-opt",
     "crates/overtone-orbit",
     "crates/overtone-cgt",
+    "crates/overtone-otn",
     "crates/overtone-cli",
     "crates/overtone-wasm",
 ]
@@ -22,7 +23,7 @@ members = [
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.75"
-license = "Apache-2.0"
+license = "AGPL-3.0-or-later"
 repository = "https://github.com/overtone-qrl/overtone"
 
 [workspace.dependencies]
@@ -39,6 +40,7 @@ overtone-graph = { path = "crates/overtone-graph" }
 overtone-opt = { path = "crates/overtone-opt" }
 overtone-orbit = { path = "crates/overtone-orbit" }
 overtone-cgt = { path = "crates/overtone-cgt" }
+overtone-otn = { path = "crates/overtone-otn" }
 # No entropy source, deliberately: every random draw in this workspace is seeded
 # explicitly (Part I 5, determinism). Dropping default features removes the getrandom
 # dependency entirely, which both enforces that invariant and lets the core crates build

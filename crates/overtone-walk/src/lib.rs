@@ -1,3 +1,8 @@
+// Overtone. Copyright (C) 2026 Anbuchelvan Ganesan.
+// Licensed under the GNU Affero General Public License, version 3 or (at your option) any
+// later version. See LICENSE, or <https://www.gnu.org/licenses/>. This program is
+// distributed WITHOUT ANY WARRANTY; see the licence for details.
+
 //! Discrete-time quantum walks, the substrates they run on, and the transport exponent.
 //!
 //! Part II 2's reframe: **the policy is the coin.** In a discrete-time quantum walk each
@@ -29,10 +34,12 @@ pub mod coin;
 pub mod race;
 pub mod stats;
 pub mod substrate;
+pub mod two;
 pub mod walk;
 
 pub use coin::Coin;
 pub use race::{optimise_coins, race, Entrant};
 pub use stats::{classical_sigma, fit_exponent, regime, regime_of, PowerLaw};
 pub use substrate::{Substrate, Word, ALL_WORDS};
+pub use two::{correlate, evolve, similarity, Column, Correlation, Modes, Statistics};
 pub use walk::{sigma_trace, Run, Walk};

@@ -52,6 +52,43 @@ impl Walk {
         }
     }
 
+    /// A field localised at lattice position `x` in an arbitrary coin state.
+    ///
+    /// [`Walk::new`] is the symmetric start every substrate comparison uses; this is the one
+    /// M28 needs, because building a single-particle unitary means evolving each basis mode
+    /// `(site, coin)` on its own and reading off where it went.
+    pub fn localised(max_steps: usize, x: i64, coin: [C64; 2]) -> Self {
+        let sites = 2 * max_steps + 1;
+        let centre = max_steps as i64;
+        let site = centre + x;
+        assert!(
+            site >= 0 && (site as usize) < sites,
+            "position {x} is outside a {max_steps}-step window"
+        );
+        let mut amps = vec![C64::ZERO; 2 * sites];
+        amps[2 * site as usize] = coin[0];
+        amps[2 * site as usize + 1] = coin[1];
+        Walk {
+            scratch: vec![C64::ZERO; 2 * sites],
+            amps,
+            centre,
+            steps: 0,
+            lo: site as usize,
+            hi: site as usize,
+        }
+    }
+
+    /// The raw mode amplitudes, `amps[2 * site + coin]`, with `site` measured from the left
+    /// edge of the window rather than from the origin. Paired with [`Walk::centre_site`].
+    pub fn mode_amplitudes(&self) -> &[C64] {
+        &self.amps
+    }
+
+    /// The site index holding lattice position zero.
+    pub fn centre_site(&self) -> usize {
+        self.centre as usize
+    }
+
     pub fn steps(&self) -> usize {
         self.steps
     }

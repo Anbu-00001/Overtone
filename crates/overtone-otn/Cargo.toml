@@ -1,0 +1,16 @@
+[package]
+name = "overtone-otn"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "The .otn notation: a frozen, versioned, self-verifying record of an Overtone game"
+
+[dependencies]
+overtone-orbit.workspace = true
+overtone-sim.workspace = true
+overtone-graph.workspace = true
+overtone-lie.workspace = true
+rand.workspace = true
+rand_chacha.workspace = true

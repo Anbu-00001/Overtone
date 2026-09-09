@@ -257,6 +257,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "overtone-otn"
+version = "0.1.0"
+dependencies = [
+ "overtone-graph",
+ "overtone-lie",
+ "overtone-orbit",
+ "overtone-sim",
+ "rand",
+ "rand_chacha",
+]
+
+[[package]]
 name = "overtone-qd"
 version = "0.1.0"
 dependencies = [
