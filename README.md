@@ -9,8 +9,18 @@ circuit. That is Schuld, Sweke and Meyer, *Phys. Rev. A* **103**, 032430 (2021).
 
 Overtone points that theorem at a reinforcement-learning policy in real time.
 
-It also computes what a circuit can learn *before* you train it, from the algebra of its
-generators alone, and then trains the thing to show the prediction landing.
+> **Overtone reads your circuit's algebra and predicts whether it will train — before you
+> train it.**
+>
+> The prediction holds when the theory's hypotheses hold. Overtone checks them and tells you
+> when they do not. It also measures whether your trainable circuit is one a classical
+> computer could already simulate — because for most known constructions, it is.
+
+The second paragraph is load-bearing rather than a hedge. `predict` refuses to answer when
+`rho` and `O` both sit outside `g`, because `Var[dC] ~ 1/dim(g)` is a theorem with hypotheses
+and Diaz et al. exhibit polynomial-`dim(g)` circuits that plateau anyway. A tool that says *"I
+cannot predict this one, and here is why"* is worth more than one that always answers, and
+there is a gate line asserting that it still refuses.
 
 **A hundred-qubit quantum RL policy trains exactly, in four seconds, on one CPU core.** Not
 sampled, not approximated: the transverse-field Ising algebra has dimension `n(2n-1)`, which
@@ -20,15 +30,18 @@ polynomial, and a polynomial `dim(g)` is exactly the condition for having no bar
 The circuits that train are the circuits that are classically simulable. That tension is the
 live question in the field, and this repository names it rather than routing around it.
 
-**Status: Phase 9 of 11, complete.** The simulator, both gradient paths, the RL loop, the LP
+**Status: Phases 1-9 and 12-15 complete; Phase 5 partial.** The simulator, both gradient paths, the RL loop, the LP
 ceiling, the spectral instrument, the browser demo, the closure engine, g-sim, the
 dequantization test, the substrate worlds, the transport instrument, the maze eigenbasis, the
 linearly-solvable MDP, the optimiser flatline, the quantile critic and shot dial, eigenoptions
 with Go-Explore, and architecture search with its verification, and Orbit's win condition, turn loop, endgame tablebase and complexity
-dial are built and verified. Phase 9 is headless by design: Part VII forbids an interface
-before the game's depth has been measured. Phase 5, the lattice, is **partial**: Part IV's worlds cannot be measured without a
-walk, so the one-dimensional core of Part II's M6 and M7 was built early, and what remains
-is everything two-dimensional. See [docs/PHASES.md](docs/PHASES.md) for the plan and
+dial are built and verified. Since then: thermography and the Chinese Rings (Phase 12), two-particle
+exchange statistics, the `.otn` notation and the Overtone-100 benchmark (Phase 13), the coined
+walk operator with Kempe's hypercube gap and the welded-tree reduction (Phase 14), and the
+frozen agent language v1 (Phase 15). Phase 9 is headless by design: Part VII forbids an interface
+before the game's depth has been measured. Phase 5, the lattice, is **partial**: its M8 landed in
+Phase 14 and its M28 in Phase 13, and what remains is the two-dimensional maze, the dark
+corridor, and M9's learned coin. See [docs/PHASES.md](docs/PHASES.md) for the plan and
 [docs/spec/](docs/spec/) for the full build specification, Parts I to VIII plus the VI-A
 traps addendum. Part VII supersedes Part VI: the arena is turn-based, the tab is `Orbit`,
 and it is not built until its depth has been measured headless.
@@ -64,6 +77,39 @@ cargo run --release -p overtone-cli -- ceiling --k 3 --max-c 12
 ```
 
 Each takes under a quarter of a second.
+
+## The seven standard dismissals, and the instrument for each
+
+Every quantum-ML project meets the same objections. Six of these seven are things Overtone
+**measures** rather than things it denies, so the right column is a command you can run rather
+than an argument you have to accept.
+
+| Dismissal | The instrument |
+|---|---|
+| "It's classically simulable / dequantized" | `overtone-cli -- dequantize` — fits the effective bond dimension and prints the verdict |
+| "Barren plateaus kill it at scale" | `overtone-cli -- plateau` — gradient variance against qubit count, decay rate fitted live |
+| "NISQ noise makes it worse than classical" | `overtone-rl --example shot_dial` — shots needed grow exponentially, and the shallowest optimiser wins |
+| "Only works on 4-8 qubits in simulation" | `overtone-gsim --example hundred_qubit_policy` — 100 qubits, exact, one core |
+| "Trainable circuits are the ones classical computers handle" | `overtone-cli -- predict` beside `-- dequantize`. **That is the thesis, not an objection to it** |
+
+```
+cargo run --release -p overtone-cli  -- dequantize --qubits 4 --layers 3 --k 3 --tolerance 1e-6 --max-chi 8
+cargo run --release -p overtone-cli  -- predict --family tfim --qubits 5
+cargo run --release -p overtone-cli  -- plateau --depth log:2 --max-qubits 11
+cargo run --release -p overtone-rl   --example shot_dial
+cargo run --release -p overtone-gsim --example hundred_qubit_policy
+```
+
+Two of the seven are not in the table, and their absence is the point of the exercise.
+
+- *"No quantum advantage demonstrated."* None is claimed. There is no panel because there is
+  nothing to measure.
+- *"An interactive demo doesn't change the asymptotics."* Correct. It does not.
+
+Decisions-03 Q10 sets the bar as **every clause maps to a shipped instrument**, and applied
+honestly that bar deletes rows. Those two are arguments, so they are prose and not table rows.
+
+---
 
 ## The demo
 

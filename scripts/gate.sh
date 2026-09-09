@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The gate. Every claim in the README has a line here that fails when it stops being true.
 #
-# Run from the repository root. Phases 1-13.
+# Run from the repository root. Phases 1-15.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
@@ -33,7 +33,7 @@ expect() {
   fi
 }
 
-echo "PHASE 1-13 GATE"
+echo "PHASE 1-15 GATE"
 
 run "cargo fmt --check"                cargo fmt --all -- --check
 run "clippy -D warnings"               cargo clippy --workspace --all-targets -- -D warnings
@@ -249,6 +249,60 @@ expect "a puzzle is a few hundred bytes" \
 expect ".otn round-trips byte-exactly" \
   'test result: ok\. 11 passed' \
   cargo test --release -q -p overtone-otn --test roundtrip
+
+# Phase 14 acceptance. Part II 5, 6; Decisions 03 Q7.
+expect "the welded tree collapses to 4n+2" \
+  '^ 10 +4094 +12280 +42 +welded tree' \
+  cargo run --release -q -p overtone-walk --example hitting
+
+expect "Kempe: linear time, exponential classical" \
+  '^ 16 +26 +0\.82[0-9]+ +7\.0766e4' \
+  cargo run --release -q -p overtone-walk --example hitting
+
+expect "the reduction matches the graph to 1e-15" \
+  'welded tree n=3 .*worst \|p_graph - p_reduced\| = [0-9]\.[0-9]+e-1[5-9]' \
+  cargo run --release -q -p overtone-walk --example hitting
+
+expect "the welded walk beats its own theorem" \
+  '^ 10 +42 +204 +23 +0\.619327 +0\.005000' \
+  cargo run --release -q -p overtone-walk --example hitting
+
+expect "the DFT coin cages 3/7 of the amplitude" \
+  'hypercube n=4 +Dft +arrives 0\.571429 +never arrives 0\.428571' \
+  cargo run --release -q -p overtone-walk --example hitting
+
+expect "Table 2 reproduces, and Long's layer is exact" \
+  '^ 150 +323 +2\.153 +-0\.457824 +2 +1\.4818 +1\.00000000000' \
+  cargo run --release -q -p overtone-walk --example hitting
+
+# Phase 15 acceptance. Part VIII 2; Decisions-01 Q1, Q4; Decisions-03 Q4, Q5; Decisions-05.
+expect "the language rejects with its vocabulary" \
+  'unknown feature `reach_margin`; v1 froze dim_g, orbit_size, safe_set_size, half_chain_entropy' \
+  cargo run --release -q -p overtone-orbit --example agents
+
+expect "a field that cannot act is rejected" \
+  '`rollout` is only meaningful for kind = "mcts", not `greedy`' \
+  cargo run --release -q -p overtone-orbit --example agents
+
+expect "progressive widening holds the root to sqrt(N)" \
+  '^ +kestrel +512 +513 +23 +1[0-9][0-9] +[0-9]+ +' \
+  cargo run --release -q -p overtone-orbit --example agents
+
+expect "the temperature field is flat where it runs" \
+  '^ +ply 0: temperature field = \[-1\.0, -1\.0, -1\.0\]' \
+  cargo run --release -q -p overtone-orbit --example agents
+
+expect "budget is a compute axis for all three kinds" \
+  '^ +pike +64 +12 +0 +0 +1\.000' \
+  cargo run --release -q -p overtone-orbit --example agents
+
+expect "the language digest is pinned" \
+  'test result: ok\. 12 passed' \
+  cargo test --release -q -p overtone-orbit --test language
+
+expect "presentation constants cannot change a result" \
+  'test result: ok\. 3 passed' \
+  cargo test --release -q -p overtone-orbit --test presentation
 
 echo
 echo "  passed=$passed failed=$failed"

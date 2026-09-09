@@ -192,13 +192,15 @@ rather than met.
 
 ---
 
-## Phase 5 — The lattice  *(M6–M9, M28)*  — PARTIAL
+## Phase 5 — The lattice  *(M6–M9, M28)*  — PARTIAL (M8 and M28 done; M9 and the maze open)
 
 **The one-dimensional core of M6 and M7 landed early, in Phase 7**, because Part IV's worlds
 cannot be measured without a walk. `overtone-walk` has the strict light cone, the sparse
 representation, position-dependent coins, trajectory-based decoherence, the fitted spreading
-exponent, and the Hadamard/Grover/classical baselines. What is still outstanding is
-everything two-dimensional and everything about mazes.
+exponent, and the Hadamard/Grover/classical baselines. **M28 landed in Phase 13** and **M8 in
+Phase 14**, the latter in the order Decisions-03 Q7.4 revised — hypercube before welded trees,
+with the Szegedy module deleted rather than built. What is still outstanding is the
+two-dimensional maze, the dark corridor, and M9's learned coin.
 
 **Spec:** Part II.
 
@@ -1242,13 +1244,526 @@ would have shipped a benchmark that measured nothing:
 
 ---
 
+## Phase 14 — The walk operator  *(M8, in the order Decisions-03 revised it)*  — DONE
+
+**Spec:** Part II §§5, 6, and Decisions-03 Q7, which supersedes both.
+
+This is Phase 5 material built out of order. The milestone is **M8 — the special graphs**, and
+Q7 changed what it contains, how much of it there is, and which of its three acceptance
+clauses can still be met.
+
+### One engine, not three
+
+The plan carried `CoinedWalkEngine`, `SzegedyWalkEngine` and a glued-trees walk as separate
+objects. Q7.2 deletes the second outright: with a Grover coin and a flip-flop shift, two
+coined applications *are* one Szegedy application (Wong 2016; Portugal & Segawa 2017), and the
+bipartite double cover is a representation device rather than a second walk. What shipped is
+one `Coined` over the arcs of any graph, with the coin taken **per vertex** because the welded
+tree is 3-regular everywhere except its two roots, which have degree 2.
+
+```
+overtone-walk::coined     U = S C, arc-indexed, variable degree, Grover or DFT coin
+overtone-walk::families   hypercube(n), welded_tree(n, seed), classical_hitting(n)
+overtone-walk::reduced    Line -- the reduced walk both families collapse to
+overtone-walk::hitting    one-shot, concurrent, residual
+```
+
+### The reduction is the panel
+
+Part II §5 asked for a panel in which the exponentially large graph collapses to a line in
+front of the reader. Q7.5 points out that this stopped being a visualisation choice: both
+families confine the walk to a subspace of dimension *linear* in the parameter, and the demo
+is that subspace.
+
+```
+  n    vertices       arcs    reduced   family
+ 10        4094      12280         42   welded tree
+ 20     1048576   20971520         40   hypercube
+```
+
+**The two reductions have the same shape, and that was not obvious in advance.** Li, Li and
+Luo's `M_U = M_S M_C` (Lemma 3.1) and Krovi and Brun's Hamming-weight reduction of the
+hypercube (Eqs. 26–27) are both `diag(1, B₁ … B_m, 1)` against `diag(R, R, …)` — two families
+of two-by-two reflections on interleaved pairings of a line, which is the staggered walk model
+arrived at from two directions. Only the blocks differ: constant `cos = 1/3` either side of
+the weld, versus `cos ω_x = 1 − 2x/n` with Hamming weight. So there is one `Line` type and not
+two, and both reductions are real orthogonal matrices — no complex arithmetic survives them.
+
+### M8's acceptance clause, met exactly
+
+> *glued-trees column reduction matches full-graph evolution*
+
+`tests/hitting.rs` runs the coined walk on the actual welded tree — random cycle, random
+naming, three seeds — and compares the amplitude on `|t, φ(t)⟩` step by step against the
+`4n+2` model. Worst disagreement `7e-16`, which is machine epsilon and not a tolerance.
+
+This is the test Q7.5 says is the one that matters, and it is worth being explicit about why:
+an incorrect reduction produces a walk that runs, stays unitary, and yields a plausible
+hitting curve. Nothing about it looks wrong. Only the graph it claims to reduce can say.
+
+### Kempe first, deliberately
+
+Q7.4 reorders M8 to put the hypercube ahead of the welded tree: peer-reviewed since 2005
+against a result from 2024, and no oracle needed. It validates the engine against something
+settled before the engine is used to check something recent.
+
+```
+  n      T      p(T)       classical
+  8     12    0.9614        3.1208e2
+ 12     18    0.9586        4.5889e3
+ 16     26    0.8275        7.0766e4
+ 20     32    0.8934        1.1114e6
+```
+
+`T ≡ n (mod 2)` with `|T − πn/2| ≤ 1`, and the classical column is an exact tridiagonal solve
+of the lumped birth–death chain, not a simulation. **The parity condition is load-bearing.**
+The hypercube is bipartite by Hamming weight, so a walker is only ever at weight `≡ T (mod 2)`
+and the antipode has weight `n`; round `πn/2` to the nearest integer without it and half the
+dimensions return exactly zero, which reads as a broken walk rather than a broken test.
+
+The convergence is `1 − O(n^{-1/5})`, and at sizes you can plot it is neither fast nor
+monotone: `n = 2` returns an exact zero, because the two-port Grover coin is the Pauli `X` and
+the walk is a deterministic cycle. That is what an asymptotic theorem looks like up close, and
+the table prints it rather than starting at the size where it flatters.
+
+### Two facts the theorems do not give you
+
+Li, Li and Luo's Theorem 4.1 promises `max{p(t) : t ∈ [2n, 3.6 n log₂(5n)]} > 1/(20n)`.
+Measured:
+
+```
+  n reduced  horizon      T1      p(T1)    1/(20n)    T1/n
+ 10      42      204      23   0.619327   0.005000    2.30
+ 20      82      479      45   0.549208   0.002500    2.25
+ 30     122      781      67   0.434605   0.001667    2.23
+```
+
+**The bound gives away two orders of magnitude** to be a bound. And **`T1` lands at about
+`2.2n`** while the horizon it is searched over grows as `n log n`, so the classical
+precomputation overshoots by a widening margin — except at `n = 3` and `n = 4`, where the best
+time jumps to 33 and 59 for a few percent more probability, which is the only thing that makes
+scanning the rest of the window worth doing at all.
+
+*The second of those is the paper's own Conjecture 6.1, not a new observation.* §6 conjectures
+`T ∈ [2n, 2.5n]` with `T ≈ n/√(pq) = 2.1213n` from its own numerical simulation, and only odd
+`T`, because `p_T = 0` on every even step. Measured here: `T1/n` is `2.30` at `n = 10`, `2.15`
+at `n = 100`, `2.137` at `n = 300`, always odd. This is a reproduction of a conjecture, and it
+is worth being clear about which of the two facts above is which.
+
+*The base of that logarithm is 2.* The paper writes `log`; Eq. (4.73) pins it down by using
+`(1/2)^{log 5n} = 1/(5n)`. Wrong base costs a factor of 1.44 in the horizon and nothing in the
+answer, which is exactly the kind of constant a reader reproducing the number would trip over.
+
+*Two versions disagree on the constants.* arXiv:2304.08395v2 states `1/(20n)` at
+`T ≈ 3.6 n log₂(5n)`; Decisions-03 quotes `1/(24n)` and `log(24n)` from the Algorithmica
+version. The gate asserts against the stronger one.
+
+*And Decisions-03 §12's fourth unknown, answered.* It asks for the smallest `n` at which the
+bound actually holds in this implementation, on the grounds that the theorem is only proved
+for sufficiently large `n`. **The answer is `n = 1`.** It holds at every size from 1 to 40,
+never closer than a factor of 30 to the floor. The asymptotic qualifier is a limitation of the
+proof technique, not a property of the walk.
+
+### Algorithm 2, and the two claims the abstract runs together
+
+Q7.1.4 is the correction the amplification layer exists to honour, and it was the largest
+single error in the earlier ruling:
+
+```
+plain walk alone   ->  p = Omega(1/n)                   <- this is the exponential separation
+zero error         =   plain walk + exact amplification  <- this is the paper's title
+```
+
+Both are true and they are different claims. The layer is Long's algorithm — `A = M_U^{T1}`,
+`G(α, β) = A S₀(β) A† S_t(α)` with `α = −β = 2 arcsin(sin(π/(4T₂+2)) / sin θ)`,
+`θ = arcsin|⟨t|A|0⟩|`, `T₂ = ⌈(π/2 − θ)/(2θ)⌉` — and on the reduced walk it is cheap, because a
+real orthogonal `M_U` means a complex state is two real vectors stepped by the same routine.
+
+```
+   n     T1    T1/n   amplitude   T2     alpha  p after amplifying
+  50    109   2.180    0.623306    1    1.8619   1.000000000000060
+ 100    215   2.150   -0.510514    1    2.7350   1.000000000000118
+ 150    323   2.153   -0.457824    2    1.4818   1.000000000000295
+```
+
+**`T1` at `n = 50, 100, 150` is `109, 215, 323` — the paper's Table 2 exactly**, recomputed
+from the reduced matrix with no constant taken from the paper except the horizon. That is the
+closest thing to an independent end-to-end replication this result has, and Decisions-03 notes
+there was none.
+
+One Grover round suffices up to `n = 100`; `n = 150` is the first size needing two, which is
+why it is in the test.
+
+### The cage, and the coin the note has to name
+
+Decisions-03 §11 asks for Krovi and Brun's infinite hitting times as a note under Part VI-A
+§T2 — the purest instance of the AB-cage trap, a configuration where the walker provably never
+arrives, from interference alone. **The note must name the coin.** Krovi and Brun's infinite
+hitting times are a *DFT-coin* phenomenon; the Grover coin on the same graph, from the same
+start, arrives with probability one. Written without the coin the note reads as if it
+contradicts the Kempe milestone directly above it.
+
+Measured, on the 4-cube, 20 000 measured steps:
+
+```
+  hypercube n=4    Grover     arrives 1.000000   never arrives 0.000000
+  hypercube n=4    Dft        arrives 0.571429   never arrives 0.428571
+```
+
+**Exactly 3/7 of the amplitude never reaches the far corner** — converged to `1e-13`, with the
+last quarter of the run detecting `9e-30`. Krovi and Brun give the mechanism for this graph
+(the DFT operator on `Q₄` has eigenvalues `1, −1, i, −i`, each eightfold degenerate, leaving a
+sixteen-dimensional space of eigenvectors with no amplitude at the target); the 3/7 is measured
+here, not quoted from them. And it is dimension-specific: on the 3-cube the same coin arrives
+with probability one, which is why they name dimension four.
+
+### M8's third acceptance clause no longer means anything
+
+> *the √HT slope fits*
+
+This came from Part II §P6, which quotes Szegedy's square-root-of-hitting-time result and then
+applies it to maze traversal. Decisions-03 §3 separates three things the literature calls
+hitting time — one-shot, concurrent, and marked-vertex search — and the `√HT` result is about
+the third. **Marked-vertex search is not entrance-to-exit traversal**, so there is no √HT slope
+to fit for the thing M8 was measuring, and the Szegedy module that was to produce it is gone.
+
+Replaced by: Kempe's one-shot hitting on the hypercube against the exact classical `2^n`,
+which is the same claim M8 wanted — a provable separation in traversal time — with a theorem
+that is actually about traversal.
+
+### Exit criteria — met
+
+- Reduced model matches the full graph on the welded tree: `7e-16`, three seeds, `n = 1..3`.
+- Reduced model matches the full graph on the hypercube: `n = 1..7`.
+- Kempe's hitting probability above `0.45` at the prescribed `T` for every `n` in `8..20`.
+- Welded-tree success probability above `1/(20n)` for every `n` tried, `2 ≤ n ≤ 16`.
+- `p(t) = 0` **exactly** for `t < 2n`, and on every even `t` — the light cone and Eq. (4.81),
+  structurally rather than numerically, so the assertion is equality and not a tolerance.
+- Long's amplification reaches `1.0` to `1e-12` at every size tried, including `n = 150` where
+  `T₂ = 2`; Table 2 reproduces exactly.
+- Both reductions orthogonal to `1e-14`; the arc-indexed walk unitary to `1e-13` on a graph of
+  mixed degree, under both coins.
+
+### Q7.4's build order, and what is left of it
+
+```
+1. hypercube hitting (Kempe)              done
+2. welded trees, reduced (4n+2) model     done
+3. welded trees, full coined walk         done -- and it is what validates 2
+4. CTQW for Part V 1.3's exponent toggle  already built, in Phase 8
+5. exact amplification layer              done, though the ruling called it optional
+6. Szegedy                                deleted
+```
+
+Item 4 needed nothing: `overtone-graph::evolve` has carried it since M22. `diffuse` is
+`e^{-Lt}` and `interfere` is `e^{-iLt}` over the same eigenbasis of the same maze Laplacian,
+which is exactly Part V §1.3's real-versus-imaginary toggle. Building a second one would have
+been the mistake Q7.4 is about, one crate over.
+
+### What remains of Phase 5
+
+Two-dimensional mazes from a seeded coordinate hash, the designed dark corridor below `1e-6`,
+and **M9, the learned coin**. Q7.2 has one thing to say about M9 before it starts: a learned,
+position-conditioned coin is precisely the "arbitrary position-dependent coin" that the
+coined/Szegedy equivalence excludes, so it inherits **no** quadratic hitting-time guarantee. If
+it beats Grover on some family that is an empirical finding needing its own justification, not
+a theorem being applied.
+
+---
+
+## Phase 15 — The agent language  *(M41a)*  — DONE
+
+**Spec:** Part VIII §2, and Decisions-01 Q1, which created this milestone and moved it in front
+of M39.
+
+### Why a milestone exists at all
+
+> `d` is not a property of the game. It is a property of **(game, strategy language)**.
+
+Lantz et al. measure resistance to partial solutions *by a specific family of agents*. Change
+the family and the number changes, so the language is part of the experimental apparatus and
+has to be frozen before `d` is measured rather than after. Phase 9's M35 measured a `d` over
+`overtone-orbit::ladder`'s language; the league would have measured a different one over a
+different language, and neither number would have described the other.
+
+There was a sharper problem underneath, and it is the one that decided the design:
+
+> **A pure declarative feature-weight policy has no compute axis at all.**
+
+It evaluates in `O(1)` per move. A ladder over it has no rungs, so `d` is not merely mismatched
+over the league population — it is undefined. The resolution is to **declare the search, not
+the policy**: the submitter names a kind and a budget from a published vocabulary and the
+engine runs the search. Part VIII §2's rule that no submitted code is ever executed holds
+unchanged, and `budget` is the rung index.
+
+```toml
+language   = "v1"
+
+[agent]
+name       = "kestrel"
+generators = ["pawn", "rook", "bishop", "knight"]
+
+[agent.search]
+kind       = "mcts"        # "greedy" | "negamax" | "mcts"
+budget     = 512           # the compute axis
+rollout    = "tablebase"   # "random" | "tablebase"
+
+[agent.eval]
+features   = ["dim_g", "orbit_size", "safe_set_size", "half_chain_entropy"]
+weights    = [0.31, -0.12, 0.44, 0.08]
+```
+
+### Four differences from the ruling's example, each one measured or checked
+
+Decisions-01's TOML is explicitly placeholder — it admits inventing `reach_margin` — so the
+differences are deliberate.
+
+| Ruling's example | v1 | Why |
+|---|---|---|
+| six features | **four** | `freeze.rs` measured all eight candidates. `coherence` and `average_branching` are constant across siblings; `separation_deficit` is dominated by `dim_g` at 14× the cost; `temperature` is the best discriminator measured and is cost-disqualified at 714 µs against the 4096 evaluations a budget-4096 move needs. |
+| `reach_margin` | **absent** | It corresponds to nothing implemented. Decisions-03 Q1 withdraws it; `orbit_size` and `safe_set_size` cover its intent. |
+| `"bishop-Z2"`, `"knight-hop"` | `"bishop"`, `"knight"` | Those names do not exist. Part VII §2 has four pieces. |
+| `statistics = "fermionic"` | **absent** | `Game::merge` does not implement exchange statistics, so the field could not change an outcome — which is precisely what Part VII §0's invented-number test forbids. It goes in when rule 6 consumes it, as a v2 change. |
+
+### The eval is a difference, and that is not a style choice
+
+`Eval::score` is `Σ wᵢ (fᵢ(me) − fᵢ(them))` over normalised features. Negamax is only correct on
+a zero-sum evaluation; an eval scoring the side to move alone would make `kind = "negamax"`
+quietly unsound, nobody would notice, and the resulting `d` would describe an agent family that
+does not do what its spec says.
+
+Each feature is normalised against a **structural** ceiling rather than a tuned scale:
+`dim(su(2^n)) = 4^n − 1`, the orbit is a submanifold of a `2^(n+1)`-dimensional real space,
+`2^n` cells can be safe, and the half-chain entropy of `n/2` qubits is at most `(n/2) ln 2`.
+The two exponential ones are compressed by `ln(1+x)` first, because a linear eval over a
+quantity spanning `4^n` is an eval over one feature.
+
+### Q4's canonicalisation, in the order that makes it sound
+
+Decisions-03 Q4 caught a gap: under greedy argmax `w` and `2w` select identically, but UCT
+compares the exploitation term against `c√(ln N / n)`, so **scaling the weights changes an MCTS
+agent's behaviour**. L2-normalising alone would be a behaviour-changing transform disguised as
+canonicalisation — invisible in review, visible only as an unexplained rating shift.
+
+1. `Eval::uct_value` maps the score into `[0, 1]` at point of use, dividing by the weights' L1
+   norm, which is the exact bound given features in `[0, 1]`.
+2. `Agent::parse` then L2-normalises, rejecting all-zero and non-finite.
+
+And the constant this makes legitimate: UCT's exploration term is `√2`, which is Kocsis and
+Szepesvári's value *derived for rewards in `[0, 1]`*. The two halves depend on each other —
+normalise the eval differently and `√2` stops being the right number.
+
+### One collapse function, two regimes, differing by one number
+
+MCTS is primary for a physical reason: measurement is Born-random (Part IX §1.2), so Overtone
+is a stochastic game, and expectimax's chance nodes would be 1024-way at `n = 10`. But
+`Game::apply` deliberately collapses to the **likelier** branch, because the depth ladder
+compares strategies and collapse variance is noise there.
+
+Both are now one function. `collapse_at(psi, q, draw)` keeps the one-branch when
+`weight_one > draw`, so a uniform `draw` is exactly the Born rule and the deterministic
+collapse is the *median* draw, `0.5`. The harness and play differ by one number rather than by
+one implementation.
+
+Which one a search uses is then part of what an agent declares, and `LANGUAGE_V1` says so:
+`mcts` plays the game as it is, `greedy` and `negamax` search against the deterministic
+collapse. That is a modelling error, and it is one the submitter is choosing.
+
+### `presentation.toml`, and the boundary it makes mechanical
+
+Decisions-01 Q4 asks for one file holding every authored presentation constant, plus a CI test
+that perturbs each and asserts match results are unchanged. Both shipped. The operational test
+for what may live there is the ruling's own: **a number is invented if changing it changes an
+outcome**, so a presentation constant is one that can change how something is shown or accepted
+and can never change a result.
+
+It is deliberately short — two entries — and the value is not its length. Most numbers in this
+repository are measured or derived. The point is that the first mechanic anyone tries to hide
+in it has somewhere to be caught.
+
+### Decisions-05, which landed mid-build and changed four frozen things
+
+| Item | Was | Now |
+|---|---|---|
+| Temperature mechanism | PUCT prior | **Progressive bias**, `W·H/(1+n)` |
+| Field name | `temperature_prior` | **`temperature_bias`** |
+| Default weight | 0.7 | **0.15** |
+| Temperature's second role | none | **expansion ordering under widening** |
+| Chance nodes | sampling | **explicit in the tree** |
+| `rollout` value | `"random"` | **`"playout"`** |
+
+The mechanism change is the substantive one. Temperature is an unbounded positive scalar, not
+a distribution, so a PUCT prior would have to softmax it — imposing a distribution shape on
+something that is not one, adding a scaling parameter with no published guidance, and putting a
+softmax temperature `τ` three lines from CGT temperature `H` in the same function. Additive
+progressive bias needs none of that, and its `1/(1+n)` decay hands control to the empirical
+mean as visits accumulate, which is the forgiving behaviour you want from a heuristic nobody
+has validated yet.
+
+### The heuristic costs more than the search it guides
+
+A literal reading of §1 wants `H(s,a)` at every node. Measured, at `n = 4` with three regions,
+**one temperature field costs 577 µs** — and MCTS creates about one node per playout:
+
+```
+budget 512   heuristic per node   0.30 s     entire search   0.09 s
+budget 4096  heuristic per node   2.4 s
+```
+
+Five to eight times the search. So `H` is a property of the *move*, evaluated once in the root
+position, and it is stale deeper in the tree — which is exactly the case progressive bias was
+chosen for.
+
+### And the heuristic is flatter than the freeze measurement suggested
+
+This is a correction to Phase 12's own reporting. `freeze.rs` measured `temperature` at a
+sibling spread of **1.207**, the largest of any candidate feature, and that number is real.
+What it is measuring is not.
+
+```
+ply 0..4, n = 4 and n = 6:   temperature field = [-1.0, -1.0, -1.0]
+                             24 of 240 candidates raise a region above -1
+```
+
+The field is **uniformly −1** — every region is a *number*, which is the CGT convention for
+cold — and about a tenth of the moves lift one region to `0`. So temperature here is a
+near-binary *"this move heats a region"* indicator rather than a graded urgency field, and
+the 1.207 is one outlier in twenty-four divided by a mean sitting at −1.
+
+Decisions-05 §2 already hedges precisely this — the default weight is 0.15 rather than 0.7
+because nobody yet knows whether this is CGT temperature proper or something
+temperature-shaped, and Prompt B is still out. This is the measurement behind the hedge, and
+it says the hedge was right.
+
+**A consequence worth its own line:** a constant heuristic adds a constant to every child's
+UCT score and reorders nothing, so on a flat field `temperature_bias` is inert *by
+construction*. `tests/search.rs` asserts that rather than asserting a change that does not
+happen — a test that demanded the weight move the search would have been demanding that a
+constant offset break ties, which would mean something else was wrong.
+
+### The tie-break that made a whole move class unreachable
+
+Flat heuristic, stable sort, and the expansion order becomes whatever `legal_moves` emits —
+whose first 208 of 240 candidates are all `Apply`. Under widening the root expands about 23
+children, so **no measure move was ever tried at all.** The fix is to shuffle before the stable
+sort, so ties break on a seeded permutation instead of on the move generator's enumeration
+order. Measured after: 141 of 513 nodes at budget 512 are chance nodes.
+
+### Chance nodes: the ruling's premise does not match the rule
+
+§4 requires double progressive widening at chance nodes because *"at `n = 10` a position
+measurement has up to 1024 outcomes"*. Part VII §5 rule 3's measure move is
+`Move::Measure { qubit }` — it collapses **one** qubit. A chance node here has exactly **two**
+outcomes, both enumerated with their exact Born weights. There is nothing to widen and nothing
+to sample; a distribution you can write down is not one to draw from.
+
+The ruling's real requirement is implemented, and it was a genuine defect before: chance is
+now explicit in the tree rather than folded into whichever outcome happened to be sampled
+first. If the rule ever becomes a register-wide measurement, `Kind::Chance` is the node that
+needs widening, and the code says so where it is defined.
+
+### Progressive widening, and why it is not optional here
+
+```
+children ≤ ceil(k · visits^α),   k = 1, α = 0.5
+```
+
+Coulom (2007) and Chaslot et al. (2008), as stated by Couëtoux et al. (2011); Browne et al.
+(2012) note widening is *especially* effective when preferred actions are tried first, which is
+what §3 puts temperature in the tree to do. At `n = 4` an agent holding all four generators has
+**240 candidates**, so full expansion spends the first 240 playouts of a 512 budget giving
+every candidate exactly one visit and never reaches a second ply. Measured with widening:
+
+```
+   name   budget   nodes  root kids   chance   depth   ms/move
+kestrel       16      17          4        5       4      62.3
+kestrel      128     129         12       36       6     214.8
+kestrel      512     513         23      141       6     866.2
+```
+
+### Work units, and where the model stops describing the machine
+
+Decisions-03 Q5: **one work unit is one complex-coefficient update in the active
+representation**, computed analytically per gate rather than counted in the inner loop. A
+counter is a measurement; a coefficient table is an assumption — and this reads the cost off
+the machine instead of asserting it.
+
+```
+   name      kind   budget   work units/move   ns per unit
+kestrel      mcts      512            999424         781.4
+   pike   negamax      512             16384         213.0
+  stoat    greedy      512              2048         124.4
+```
+
+The six-fold spread in nanoseconds per unit is the honest part. At `n = 4` a state vector is
+16 amplitudes, so per-call overhead — building an `Observable`, allocating the new vector —
+dominates the updates the unit counts, and MCTS pays it more often. The unit becomes a
+faithful currency as `2^n` grows; at demo widths it is a lower bound on a constant-heavy cost,
+and printing wall clock beside it is what keeps that visible.
+
+### The compute axis, and a bug it caught
+
+```
+   name   budget    W    D    L   win rate     vs stoat@1, 12 games
+kestrel        1    7    5    0      0.792
+kestrel       64   11    0    1      0.917
+   pike        1    0   11    1      0.458
+   pike       64   12    0    0      1.000
+  stoat        1    0   10    2      0.417
+  stoat       64   10    0    2      0.833
+```
+
+Wins, draws and losses separately, because the rate alone hides the shape: **low budgets do not
+lose, they draw**, and converting draws is what the compute buys.
+
+The first version of this table was flat for `negamax` at every budget below 240, at exactly
+`0.479`. The cause was in `negamax_root`: an iteration aborted by the node budget discarded its
+best move and fell back to the first candidate, so an agent whose budget was under the
+candidate count always played the same move whatever its budget. Every move an aborted
+iteration *did* examine was searched to full depth, so keeping the best-so-far is both standard
+and correct. The symptom was two identical win rates, and nothing else.
+
+### Decisions-05 §5's open question, first data point
+
+Both research passes came back **NOT FOUND** on whether exact terminal evaluation changes the
+shape of the performance-versus-compute curve, and the ruling notes Overtone is unusually well
+equipped to answer it: an exact tablebase, a skill-trace protocol, and a compute axis. The
+answer is free, because `rollout` is already an agent field and the grid *is* the experiment.
+
+What can be said now: `tablebase` and `playout` differ here **only in the terminal value**, and
+both reach it by the same uniform random walk to the coherence horizon. Before the comparison
+can mean anything, that walk has to carry signal — which is M39's first job rather than
+something to tune quietly now.
+
+### What this unblocks
+
+M39 (the Goodman grid, re-measured over v1 and reported as **Skill Trace**), then M38 the
+board, then M43 the league — all of which were waiting on a frozen language and none of which
+could have produced a comparable number without one.
+
+---
+
 ## The Decisions documents, and what they change
 
-Two rulings documents supersede parts of the specs where they conflict:
+Five rulings documents supersede parts of the specs where they conflict:
 [`decisions-01-phase-10.md`](spec/decisions-01-phase-10.md) rules on the eight open Phase 10
 questions; [`decisions-02-synthesis.md`](spec/decisions-02-synthesis.md) synthesises four
-external research passes into a claims audit. Both are committed to `docs/spec/` because a
-ruling that lives outside the repository is a ruling that gets lost.
+external research passes into a claims audit; and
+[`decisions-03-revised.md`](spec/decisions-03-revised.md) rules on the walk operator, the v1
+feature vocabulary and the licence, and supersedes an earlier Decisions-03 in full.
+Decisions-04 amends the MCTS design and **is not in this repository** — see the note below.
+[`decisions-05.md`](spec/decisions-05.md) then amends Decisions-04 from two MCTS research
+passes. All of them are committed to `docs/spec/` because a ruling that lives outside the
+repository is a ruling that gets lost.
+
+**Decisions-04 is missing and it matters in one specific place.** Decisions-05 references it
+four times — it specified PUCT (§1), used `0.7` as the example weight (§2), and its §6 table
+records the frozen eval vector as **five features**. The vector frozen here is **four**:
+`dim_g`, `orbit_size`, `safe_set_size`, `half_chain_entropy`, which is what
+`overtone-orbit/examples/freeze.rs` measured against Decisions-03 Q1's six. Everything else
+Decisions-05 changes lives in `[agent.search]` and is implemented; the fifth feature is the one
+thing that cannot be recovered from the documents present, and guessing it would be worse than
+saying so.
 
 **The one that reorders everything.** Decisions-01 Q1: `d` is a property of *(game, strategy
 language)*, so the agent language is part of the experimental apparatus and must be frozen
@@ -1269,14 +1784,16 @@ is:    M41a agent-language freeze (v1) → M39 ladder → M38 board → M43 leag
 
 | Ruling | Status |
 |---|---|
-| Q1 — unify the language; declare the search; M41a before M39 | **pending** — blocks Phase 10 |
-| Q2 — work units under a published cost model; publish both curves | **pending** |
-| Q3 — Goodman grid, not adjacent rungs; pre-register `N`, 0.95, `STEP_UNIT = 2σ` | **pending** |
-| Q4 — invented number = one that changes an outcome; `presentation.toml` + perturbation test | **pending** |
+| Q1 — unify the language; declare the search; M41a before M39 | **applied** (Phase 15), with four departures from its illustrative TOML |
+| Q2 — work units under a published cost model; publish both curves | **applied** (Phase 15) — `overtone-orbit::work`, analytic per gate |
+| Q3 — Goodman grid, not adjacent rungs; pre-register `N`, 0.95, `STEP_UNIT = 2σ` | **pending** (M39) |
+| Q4 — invented number = one that changes an outcome; `presentation.toml` + perturbation test | **applied** (Phase 15) |
 | Q5 — Born distribution in the measurement basis; no bucketing, no log default | **pending** (M46) |
 | Q6 — decouple: field recomputes per ply, progressive fill; 60 fps was never the bar | **pending** (M49) |
 | Q7 — fixed scale from the Atlas 99th percentile, visible clipping, numeric max on screen | **pending** (M49) |
 | Q8 — memo table keyed on discrete state only; amplitudes are the value | **pending** |
+| Q9 — DCO 1.1 plus a non-assignment contributor licence | **half applied** — `CONTRIBUTING.md` ships the DCO; the licence needs counsel and says so |
+| Q10 — scoped headline; every README clause maps to a shipped instrument | **applied** — and the bar deleted two of the seven dismissal rows |
 | D2 — M28 citation split: Sansoni + van Exter | **applied**, with a correction (Phase 13) |
 | D2 — Part VI §1 anyonic citation "CONTRADICTED" | **rejected on the primary source** (Phase 13) |
 

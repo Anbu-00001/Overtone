@@ -364,3 +364,61 @@ Credibility is the scarce resource in this field.
 - **A benchmark category whose answers are lopsided measures nothing.** `Overtone-100`'s
   reachability set first came out 27 reachable to 3 -- 90% for a solver that always answers
   the same way. Check `balance()` on any yes/no category before shipping it.
+- **The hypercube's prescribed hitting time has a parity condition.** Kempe's `T ~ pi n / 2`
+  is `T = n (mod 2)` with `|T - pi n / 2| <= 1`. The cube is bipartite by Hamming weight and
+  the antipode has weight `n`, so rounding to the nearest integer without the parity gives
+  *exactly zero* for half the dimensions -- which reads as a broken walk, not a broken test.
+- **The Grover coin on two ports is the Pauli `X`.** Any degree-2 vertex, and the whole
+  2-cube, therefore evolves deterministically: at `n = 2` the "hitting probability at the
+  prescribed time" is an exact `0`. Do not treat an asymptotic hitting theorem as a claim
+  about small `n`; report the small cases rather than starting the table where they flatter.
+- **The welded tree is 3-regular except at its two roots, which have degree 2.** Li, Li and
+  Luo use a genuinely 2-dimensional coin there. Padding the roots to three ports produces a
+  walk that runs, stays unitary, and is not the published one. The coin interface takes
+  `d_u` per vertex for this reason alone.
+- **The welded tree's target is `|t, phi(t)>`, not the vertex `t`.** Theorem 4.1 is about the
+  overlap with the uniform superposition of the target's arcs; on a degree-2 root that is not
+  the same number as the probability of being at the vertex, and a reduced-versus-full
+  comparison against the wrong one disagrees for a reason that has nothing to do with the
+  reduction.
+- **`3.6 n log(5n)` is base 2.** The paper writes `log`; Eq. (4.73) pins it by using
+  `(1/2)^(log 5n) = 1/(5n)`. Also: arXiv v2 says `1/(20n)`, the Algorithmica version says
+  `1/(24n)`. Cite the version you measured against.
+- **A wrong reduction is invisible.** It runs, it stays unitary, and it produces a plausible
+  hitting curve. The only thing that can catch it is the walk on the graph it claims to
+  reduce -- with the random parts of the graph actually varied, since the reduction's whole
+  claim is that they do not matter.
+- **Krovi and Brun's infinite hitting times are a DFT-coin phenomenon.** The Grover coin on
+  the same graph, from the same start, arrives with probability one. Measured on the 4-cube:
+  DFT traps exactly `3/7` forever, Grover traps nothing, and on the *3*-cube DFT traps
+  nothing either. Any note citing this has to name the coin and the dimension or it reads as
+  contradicting Kempe.
+- **Marked-vertex search is not entrance-to-exit traversal.** Szegedy's `sqrt(HT)` result is
+  about finding a marked vertex from a uniform start; the welded-tree and hypercube results
+  are about traversal from a fixed source. Part II 6 applied the first to the second. There
+  are three distinct notions -- one-shot, concurrent, search -- and only the first two are
+  what Phase 5's families measure.
+- **A flat heuristic plus a stable sort is the move generator's enumeration order.** The
+  temperature field is uniformly `-1` at the widths the ladder runs at, so every candidate
+  ties; under progressive widening the root expands about 23 of 240, and since
+  `legal_moves` emits all 208 `Apply` candidates before the 32 `Measure` ones, **no measure
+  move was ever tried**. Shuffle before a stable sort whenever the key can be constant.
+- **`temperature`'s sibling spread of 1.207 is one outlier, not a gradient.** The field is
+  `-1` (a *number*, the CGT convention for cold) on 23 of 24 siblings and `0` on one; the
+  relative spread `(max-min)/|mean|` divides that single step by a mean sitting at `-1`. A
+  relative-spread metric inflates a near-binary indicator into the best-looking feature in
+  the table. Look at the values before trusting a spread.
+- **A constant heuristic cannot reorder anything.** `W*H/(1+n)` with `H` constant adds the
+  same number to every child. A test asserting that the weight changes the search would be
+  asserting that a constant offset breaks ties -- so on a flat field, assert the inertness.
+- **The move-ordering heuristic can cost more than the search.** One temperature field is
+  577 us at `n = 4`; MCTS creates about one node per playout, so per-node evaluation would
+  cost 0.3 s at budget 512 against the 0.09 s the whole search takes. Evaluate it once at the
+  root and let progressive bias's decay absorb the staleness.
+- **An aborted search iteration must keep its best move.** `negamax_root` discarded the best
+  move of an iteration cut short by the node budget and fell back to the first candidate, so
+  every budget below the candidate count played the same move. The only symptom was two
+  identical win rates on a ladder -- which reads as a flat ladder, not as a bug.
+- **A rate hides the shape; print W/D/L.** Low-budget agents here do not lose, they *draw*,
+  and converting draws is what compute buys. Two rungs can look identical on the rate and be
+  completely different underneath.
