@@ -2235,7 +2235,7 @@ the bundle. `scripts/build_space.sh` assembles it and refuses to finish otherwis
 building wasm
 assembling dist
 checking the bundle is self-contained
-bundle ok: 537 KiB total, 358 KiB wasm
+bundle ok: 539 KiB total, 358 KiB wasm
 ```
 
 The check resolves every `href` and `src` in the HTML and every relative import in every JS
@@ -2506,6 +2506,51 @@ better than the spec claims: Cantwell's Quantum Chess design notes state that "t
 concept of check or checkmate. Kings are captured like any other piece." The orbit formulation
 solves a problem the closest prior work explicitly abandoned. Cite Wu & Tarn (PRA 65, 2002) on
 subspace controllability as its basis.
+
+### The README's diagrams, and two things the audit found
+
+The README now carries five Mermaid diagrams — the `predict` decision tree drawn from
+`predict.rs` rather than from the idea of it, the no-backend runtime, the dependency tiers, the
+spec-to-gate loop with its correction edge, and a sequence diagram of what a push does.
+`scripts/check_mermaid.sh` renders every block in every tracked Markdown file and fails on a
+parse error, because a broken diagram is invisible until it is on GitHub: it renders as a grey
+error box, and nothing local tells you. The first draft had exactly that bug — `graph` is a
+reserved word, so `graph["overtone-graph"]` is a parse error while the label alone is fine.
+
+**Mermaid does not render on Hugging Face cards.** The Hub's own FAQ answers "Can I write LaTeX
+in my model card?" (yes, KaTeX, server-side) and says nothing about diagrams; `huggingface.js`
+has no mention of mermaid; and Hugging Face's own use of it is confined to the doc-builder
+documentation site, not the card renderer. So the diagrams live in the repository README, the
+Space card uses KaTeX for the Fourier series instead, and `build_space.sh` now *rejects* a card
+containing a mermaid fence rather than shipping it as a raw code block.
+
+**Two Space cards existed and disagreed.** `web/README.md` and `deploy/README.md` both carried
+front matter, `deploy_space.sh` pushed the first and `build_space.sh` the second, and the older
+one was missing `emoji`, `short_description` and `tags` entirely — so which card Hugging Face
+saw depended on which script happened to run. `deploy_space.sh` now deploys the bundle rather
+than assembling a second copy, and `web/README.md` is deleted. One card, one source.
+
+The bundler also validates the front matter against Hugging Face's documented allowed values
+before the bundle is permitted to exist — sdk, both gradient colours, `header`, the boolean
+`pinned`, the licence identifier (`agpl-3.0`; the SPDX `agpl-3.0-or-later` is not in their list
+and belongs only in prose), and that `app_file` resolves inside the bundle. Verified by breaking
+each of seven fields in turn and confirming each is caught. The alternative is a Space that
+force-pushes cleanly and then shows a configuration error.
+
+**The wasm must be in Git LFS, and the size rule is a red herring.** The first real deploy was
+rejected: *"Your push was rejected because it contains binary files... Offending files:
+pkg/overtone_wasm_bg.wasm"*. Hugging Face requires LFS for files over 10 MiB, and reading that
+as the whole story led to a `.gitattributes` that deliberately *stripped* LFS from `*.wasm` on
+the grounds that 358 KiB is far below the threshold. The two rules are independent: binary
+content needs LFS at any size. The bundle now ships the tracking rule, both deploy paths run
+`git lfs install --local` so the filter actually applies, and `space.yml` asserts the staged
+wasm is a pointer before pushing rather than learning it from the remote. The general shape:
+**a documented threshold is a statement about one rule, not a licence to assume there is only
+one.**
+
+**The no-emoji rule was unenforced until a diagram broke it.** `check_mermaid.sh` checks that
+too, exempting exactly one line: `emoji:` in the Space card, which is Hugging Face
+configuration rather than prose.
 
 ---
 

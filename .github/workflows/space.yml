@@ -54,9 +54,21 @@ jobs:
           fi
           cd dist
           git init -q -b main
+          # The bundle ships a .gitattributes that LFS-tracks the wasm, but a rule only takes
+          # effect if the LFS filters are installed in this repo -- otherwise `git add` stores
+          # the binary as a plain blob and the remote refuses the push:
+          #   "Your push was rejected because it contains binary files."
+          git lfs install --local
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
+          # Prove the filter ran rather than spending a push to find out. If LFS is not active
+          # the blob is the wasm itself, the remote rejects it, and the only signal is a failed
+          # deploy several minutes later.
+          if ! git cat-file -p :pkg/overtone_wasm_bg.wasm | head -1 | grep -q 'git-lfs'; then
+            echo "the wasm was staged as a plain blob, not an LFS pointer; HF will reject it"
+            exit 1
+          fi
           git commit -q -m "Overtone ${GITHUB_SHA:0:7}"
           # Force is correct here and only here. The Space repository is regenerated from the
           # bundle on every deploy, so its history carries nothing that is not already in this
